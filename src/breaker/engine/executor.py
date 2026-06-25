@@ -28,7 +28,7 @@ def execute_ritual(ritual: Ritual) -> RitualResult:
     """
     Возвращает RitualResult с результатом (успех/ошибка)
     """
-    
+
     print(f"\n Выполняю: {ritual.format_rule()}")
     print(f"   Тип действия: {ritual.action_type.value}")
     print(f"   Цель: {ritual.target}")
@@ -69,7 +69,7 @@ def execute_ritual(ritual: Ritual) -> RitualResult:
 
 def open_file(
     path: str | Path,
-    editor: Optional[str] = None,
+    editor: Optional[str] = "code",
     timeout: int = 10,
 ) -> str:
     """

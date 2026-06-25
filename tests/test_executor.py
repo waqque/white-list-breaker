@@ -96,7 +96,7 @@ class TestOpenFile:
         with patch("breaker.engine.executor.platform.system", return_value="Windows"):
             # create=True нужен, потому что os.startfile существует только на Windows
             with patch("breaker.engine.executor.os.startfile", create=True) as mock_start:
-                result = open_file(file)
+                result = open_file(file, editor=None)
                 assert result == f"file://{file.resolve()}"
                 mock_start.assert_called_once_with(str(file.resolve()))
 
@@ -108,7 +108,7 @@ class TestOpenFile:
         with patch("breaker.engine.executor.platform.system", return_value="Darwin"):
             with patch("breaker.engine.executor.subprocess.run") as mock_run:
                 mock_run.return_value = MagicMock(returncode=0)
-                result = open_file(file)
+                result = open_file(file, editor=None)
                 assert result == f"file://{file.resolve()}"
                 args, _ = mock_run.call_args
                 assert args[0] == ["open", str(file.resolve())]
@@ -121,7 +121,7 @@ class TestOpenFile:
         with patch("breaker.engine.executor.platform.system", return_value="Linux"):
             with patch("breaker.engine.executor.subprocess.run") as mock_run:
                 mock_run.return_value = MagicMock(returncode=0)
-                result = open_file(file)
+                result = open_file(file, editor=None)
                 assert result == f"file://{file.resolve()}"
                 args, _ = mock_run.call_args
                 assert args[0] == ["xdg-open", str(file.resolve())]
@@ -133,7 +133,7 @@ class TestOpenFile:
 
         with patch("breaker.engine.executor.platform.system", return_value="FreeBSD"):
             with pytest.raises(CommandNotFoundError):
-                open_file(file)
+                open_file(file, editor=None)
 
 
 # Тесты для execute_ritual() 
@@ -175,7 +175,7 @@ class TestExecuteRitual:
             action_type=ActionType.OPEN_FILE,
         )
 
-        with patch("breaker.engine.executor._open_system_default") as mock_open:
+        with patch("breaker.engine.executor.open_file") as mock_open:
             mock_open.side_effect = CommandNotFoundError("Editor not found")
             result = execute_ritual(ritual)
 
