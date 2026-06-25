@@ -152,10 +152,50 @@ def _open_system_default(path: Path) -> str:
         raise CommandFailedError(e.returncode, str(e.stderr))
 
 
-# Заглушки для функций, которые будут реализованы позже
-def run_shell(command: str, timeout: int = 30) -> str:
+def run_shell(
+    command: str,
+    cwd: Optional[str | Path] = None,
+    timeout: int = 30,
+    capture_output: bool = True,
+) -> str:
+    """
+    Запускает shell-команду с обработкой ошибок и таймаутом.
 
-    raise NotImplementedError("run_shell() will be implemented later")
+    """
+    # Проверка на пустую команду
+    if not command or str(command).strip() == "":
+        raise ValueError("Command cannot be empty")
+    
+    # Проверка на опасные команды 
+    dangerous_commands = ["rm -rf /", "format c:", "del /f /s /q"]
+    if any(dangerous in command.lower() for dangerous in dangerous_commands):
+        raise ValueError(f"Dangerous command detected: {command}")
+    
+    print(f"   Выполняю команду: {command}")
+
+    try:
+        result = subprocess.run(
+            command,
+            shell=True,
+            cwd=cwd,
+            timeout=timeout,
+            capture_output=capture_output,
+            text=True,
+        )
+
+        # Если команда вернула ненулевой код — считаем это ошибкой
+        if result.returncode != 0:
+            raise CommandFailedError(result.returncode, result.stderr or "")
+
+        print(f"   Команда выполнена успешно (код: {result.returncode})")
+        return f"shell://{command}"
+
+    except FileNotFoundError:
+        raise CommandNotFoundError(f"Shell or command not found: {command}")
+    except subprocess.TimeoutExpired:
+        raise CommandTimeoutError(
+            f"Command '{command}' timed out after {timeout} seconds."
+        )
 
 
 def create_test(path: str | Path, template: str = "pytest") -> str:
