@@ -198,5 +198,63 @@ def run_shell(
         )
 
 
-def create_test(path: str | Path, template: str = "pytest") -> str:
-    raise NotImplementedError("create_test() will be implemented later")
+def create_test(
+    path: str | Path,
+    content: str = "",
+    template: str = "pytest",
+) -> str:
+    """
+    Создаёт файл теста (или любой другой файл) с опциональным шаблоном.
+
+    """
+    path = Path(path).resolve()
+
+    # Если контент не задан — берём из шаблона
+    if not content:
+        content = _get_template(template, path.stem)
+
+    # Создаём родительские директории, если их нет
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Записываем файл (не перезаписываем, если уже существует — safety)
+    if path.exists():
+        raise FileExistsError(f"File already exists: {path}")
+
+    path.write_text(content, encoding="utf-8")
+    print(f"  Файл создан: {path}")
+    return f"file://{path}"
+
+
+def _get_template(template: str, module_name: str) -> str:
+    """Возвращает содержимое шаблона по имени."""
+    templates = {
+        "pytest": f'''"""Tests for {module_name}."""
+
+
+def test_placeholder():
+    """TODO: replace with real tests."""
+    assert True
+''',
+        "unittest": f'''"""Tests for {module_name}."""
+import unittest
+
+
+class Test{module_name.title().replace("_", "")}(unittest.TestCase):
+    """TODO: replace with real tests."""
+
+    def test_placeholder(self):
+        self.assertTrue(True)
+
+
+if __name__ == "__main__":
+    unittest.main()
+''',
+        "empty": "",
+    }
+
+    if template not in templates:
+        raise ValueError(
+            f"Unknown template: {template}. Available: {list(templates.keys())}"
+        )
+
+    return templates[template]
