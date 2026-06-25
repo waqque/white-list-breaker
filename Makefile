@@ -41,7 +41,6 @@ init-dirs: ## Создать директории
 	@mkdir -p $(LOGS_DIR)
 
 init-files: ## Создать файлы-заглушки
-	@echo "Создание файлов-заглушек..."
 	# Точка входа Python-модуля
 	@test -f $(SRC_DIR)/__init__.py          || echo '"""White-sheet-breaker module."""' > $(SRC_DIR)/__init__.py
 	@test -f $(SRC_DIR)/__main__.py          || echo '# Entry point: python -m breaker' > $(SRC_DIR)/__main__.py
@@ -72,9 +71,13 @@ init-files: ## Создать файлы-заглушки
 
 
 install: ## Установить зависимости (pip install -r requirements.txt)
-	# TODO: pip install -r requirements.txt
-	@echo "[install] not implemented yet"
+	@test -f requirements.txt || (echo "Файл requirements.txt не найден. Создайте его или запустите 'make init'." && exit 1)
+	pip install -r requirements.txt
 
+install-dev: ## Установить зависимости + инструменты разработки (pytest, flake8, black)
+	@test -f requirements.txt || (echo "Файл requirements.txt не найден." && exit 1)
+	pip install -r requirements.txt
+	pip install pytest pytest-cov flake8 black
 test: ## Запустить модульные тесты (pytest tests/)
 	# TODO: $(PYTHON) -m pytest $(TESTS_DIR) -v
 	@echo "[test] not implemented yet"
@@ -112,7 +115,6 @@ clean: ## Очистить артефакты: __pycache__, .pytest_cache, htmlc
 	find . -type d -name "htmlcov" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	rm -rf .coverage
-	@echo " Очистка завершена."
 
 logs: ## Показать последние 50 строк лога (logs/breaker.log)
 	@test -f $(LOGS_DIR)/breaker.log || (echo "Лог ещё не создан." && exit 0)
