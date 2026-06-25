@@ -245,3 +245,75 @@ class TestRunShell:
         with pytest.raises(CommandFailedError) as exc_info:
             run_shell("exit 42")
         assert exc_info.value.returncode == 42
+
+
+# Тесты для create_test() 
+
+
+class TestCreateTest:
+    """Тесты функции create_test.
+    """
+
+    def test_create_with_pytest_template(self, tmp_path: Path):
+        """Создание файла с шаблоном pytest."""
+        file = tmp_path / "test_example.py"
+        result = create_test(file, template="pytest")
+
+        assert result == f"file://{file.resolve()}"
+        assert file.exists()
+        content = file.read_text()
+        assert "def test_placeholder" in content
+        assert "assert True" in content
+
+    def test_create_with_unittest_template(self, tmp_path: Path):
+        """Создание файла с шаблоном unittest."""
+        file = tmp_path / "test_example.py"
+        result = create_test(file, template="unittest")
+
+        assert result == f"file://{file.resolve()}"
+        assert file.exists()
+        content = file.read_text()
+        assert "import unittest" in content
+        assert "class Test" in content
+
+    def test_create_with_custom_content(self, tmp_path: Path):
+        """Создание файла с кастомным содержимым."""
+        file = tmp_path / "custom.txt"
+        content = "Hello, World!"
+        result = create_test(file, content=content)
+
+        assert result == f"file://{file.resolve()}"
+        assert file.exists()
+        assert file.read_text() == content
+
+    def test_create_creates_parent_dirs(self, tmp_path: Path):
+        """Создание файла в несуществующей директории."""
+        file = tmp_path / "deep" / "nested" / "dir" / "test.py"
+        result = create_test(file)
+
+        assert result == f"file://{file.resolve()}"
+        assert file.exists()
+        assert file.parent.exists()
+
+    def test_create_refuses_to_overwrite(self, tmp_path: Path):
+        """Если файл уже существует — FileExistsError."""
+        file = tmp_path / "existing.py"
+        file.write_text("original")
+
+        with pytest.raises(FileExistsError):
+            create_test(file)
+
+    def test_unknown_template_raises(self, tmp_path: Path):
+        """Неизвестный шаблон — ValueError."""
+        file = tmp_path / "test.py"
+        with pytest.raises(ValueError):
+            create_test(file, template="nonexistent_template")
+
+    def test_empty_template(self, tmp_path: Path):
+        """Шаблон 'empty' создаёт пустой файл."""
+        file = tmp_path / "empty.txt"
+        result = create_test(file, template="empty")
+
+        assert result == f"file://{file.resolve()}"
+        assert file.exists()
+        assert file.read_text() == ""
