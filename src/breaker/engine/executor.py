@@ -25,7 +25,10 @@ from .exceptions import (
 
 
 def execute_ritual(ritual: Ritual) -> RitualResult:
-
+    """
+    Возвращает RitualResult с результатом (успех/ошибка)
+    """
+    
     print(f"\n Выполняю: {ritual.format_rule()}")
     print(f"   Тип действия: {ritual.action_type.value}")
     print(f"   Цель: {ritual.target}")
