@@ -1,1 +1,33 @@
-[project]\nname = "white-sheet-breaker"\nversion = "0.1.0"
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "white-sheet-breaker"
+version = "0.1.0"
+description = "Модуль ритуала начала задачи"
+requires-python = ">=3.10"
+dependencies = [
+    "rich>=13.0.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "flake8>=6.1.0",
+    "black>=23.7.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.flake8]
+max-line-length = 100
+exclude = [".git", "__pycache__", "venv"]
