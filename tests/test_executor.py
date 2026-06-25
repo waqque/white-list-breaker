@@ -13,12 +13,14 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from breaker.engine.executor import open_file, execute_ritual
+from breaker.engine.executor import open_file, execute_ritual, run_shell, create_test
 from breaker.engine.exceptions import (
     BreakerFileNotFoundError,
     CommandNotFoundError,
     CommandTimeoutError,
+    CommandFailedError,
 )
+
 from breaker.core.schema import Ritual, ActionType, RitualResult
 
 
@@ -183,3 +185,63 @@ class TestExecuteRitual:
             assert result.success is False
             assert "Editor not found" in result.error_message
             assert result.finished_at is not None
+
+# Тесты для run_shell() 
+
+
+class TestRunShell:
+
+    def test_simple_command_succeeds(self):
+        """Простая команда (echo) """
+        result = run_shell("echo 'hello'")
+        assert result == "shell://echo 'hello'"
+
+    def test_command_with_cwd(self, tmp_path: Path):
+        """Команда выполняется в указанной директории."""
+        # Используем python -c вместо pwd для кроссплатформенности
+        result = run_shell(
+            "python -c \"import os; print(os.getcwd())\"", cwd=tmp_path
+        )
+        assert result.startswith("shell://")
+
+    def test_empty_command_raises(self):
+        """Пустая команда — ValueError."""
+        with pytest.raises(ValueError) as exc_info:
+            run_shell("")
+        assert "cannot be empty" in str(exc_info.value)
+
+    def test_whitespace_command_raises(self):
+        """Команда из пробелов — ValueError."""
+        with pytest.raises(ValueError) as exc_info:
+            run_shell("   ")
+        assert "cannot be empty" in str(exc_info.value)
+
+    def test_dangerous_command_raises(self):
+        """Опасная команда (rm -rf /) — ValueError."""
+        with pytest.raises(ValueError) as exc_info:
+            run_shell("rm -rf /")
+        assert "Dangerous command" in str(exc_info.value)
+
+    def test_dangerous_format_command_raises(self):
+        """Опасная команда (format c:) — ValueError."""
+        with pytest.raises(ValueError) as exc_info:
+            run_shell("format c:")
+        assert "Dangerous command" in str(exc_info.value)
+
+    def test_command_not_found_raises(self):
+        """Несуществующая команда - CommandFailedError."""
+        with pytest.raises(CommandFailedError) as exc_info:
+            run_shell("nonexistent_command_xyz_12345_qwerty")
+        assert exc_info.value.returncode != 0
+
+    def test_command_timeout_raises(self):
+        """Команда, которая спит дольше таймаута — CommandTimeoutError."""
+        cmd = "sleep 10" if platform.system() != "Windows" else "timeout 10"
+        with pytest.raises(CommandTimeoutError):
+            run_shell(cmd, timeout=1)
+
+    def test_failing_command_raises(self):
+        """Команда с ненулевым exit code — CommandFailedError."""
+        with pytest.raises(CommandFailedError) as exc_info:
+            run_shell("exit 42")
+        assert exc_info.value.returncode == 42
