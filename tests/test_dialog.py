@@ -1,3 +1,4 @@
+# 11 passed
 from unittest.mock import patch
 from breaker.core.schema import Ritual, ActionType
 from breaker.ui.dialog import (

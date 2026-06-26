@@ -1,3 +1,4 @@
+# 5 passed
 from unittest.mock import patch
 from breaker.ui.timer import ask_duration, pomodoro_timer
 
