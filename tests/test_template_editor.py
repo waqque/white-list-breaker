@@ -1,16 +1,27 @@
+# Все тесты изолированы через tmp_path, чтобы не зависеть от реального файла.
+import pytest
 from unittest.mock import patch
-from breaker.storage.templates import RuleTemplate
-from breaker.ui.template_editor import (
-    storage,
-    list_templates_ui,
-    create_template_ui,
-    delete_template_ui,
-    search_templates_ui,
-)
+from breaker.storage.templates import RuleTemplate, TemplateStorage
+import breaker.ui.template_editor as editor_module
 
 
-def test_list_templates_ui_with_data(capsys):
-    # Показываем список с шаблонами.
+@pytest.fixture
+def isolated_storage(tmp_path):
+    # Создаём изолированное хранилище для каждого теста.
+    storage = TemplateStorage(
+        system_file="data/examples/default_templates.json",
+        user_file=str(tmp_path / "test_templates.json"),
+    )
+    # Подменяем глобальный storage в модуле
+    original_storage = editor_module.storage
+    editor_module.storage = storage
+    yield storage
+    # Возвращаем оригинальный storage после теста
+    editor_module.storage = original_storage
+
+
+def test_list_templates_ui_with_data(isolated_storage, capsys):
+    from breaker.ui.template_editor import list_templates_ui
     list_templates_ui()
     captured = capsys.readouterr()
     assert "Список сохранённых шаблонов" in captured.out
@@ -24,11 +35,11 @@ def test_list_templates_ui_with_data(capsys):
     'тест описание',
     '1',
 ])
-def test_create_template_ui(mock_input, capsys):
-    # Создаём шаблон через UI.
-    initial_count = len(storage.list_templates())
+def test_create_template_ui(mock_input, isolated_storage, capsys):
+    from breaker.ui.template_editor import create_template_ui
+    initial_count = len(isolated_storage.list_templates())
     create_template_ui()
-    final_count = len(storage.list_templates())
+    final_count = len(isolated_storage.list_templates())
     assert final_count == initial_count + 1
     captured = capsys.readouterr()
     assert "создан" in captured.out
@@ -36,8 +47,8 @@ def test_create_template_ui(mock_input, capsys):
 
 @patch('rich.prompt.Prompt.ask', return_value='user-999')
 @patch('rich.prompt.Confirm.ask', return_value=True)
-def test_delete_template_ui_user_template(mock_confirm, mock_input, capsys):
-    # Удаляем пользовательский шаблон.
+def test_delete_template_ui_user_template(mock_confirm, mock_input, isolated_storage, capsys):
+    from breaker.ui.template_editor import delete_template_ui
     test_template = RuleTemplate(
         id="user-999",
         name="Тест",
@@ -47,7 +58,7 @@ def test_delete_template_ui_user_template(mock_confirm, mock_input, capsys):
         action_type="open_file",
         is_system=False,
     )
-    storage.save_template(test_template)
+    isolated_storage.save_template(test_template)
 
     delete_template_ui()
     captured = capsys.readouterr()
@@ -55,24 +66,24 @@ def test_delete_template_ui_user_template(mock_confirm, mock_input, capsys):
 
 
 @patch('rich.prompt.Prompt.ask', return_value='run_linter')
-def test_delete_template_ui_system_template(mock_input, capsys):
-    # Пытаемся удалить системный шаблон — должна быть ошибка.
+def test_delete_template_ui_system_template(mock_input, isolated_storage, capsys):
+    from breaker.ui.template_editor import delete_template_ui
     delete_template_ui()
     captured = capsys.readouterr()
     assert "нельзя удалить" in captured.out.lower()
 
 
 @patch('rich.prompt.Prompt.ask', return_value='файл')
-def test_search_templates_ui(mock_input, capsys):
-    # Ищем шаблоны по запросу.
+def test_search_templates_ui(mock_input, isolated_storage, capsys):
+    from breaker.ui.template_editor import search_templates_ui
     search_templates_ui()
     captured = capsys.readouterr()
     assert "Результаты поиска" in captured.out
 
 
 @patch('rich.prompt.Prompt.ask', return_value='несуществующий_запрос_xyz')
-def test_search_templates_ui_no_results(mock_input, capsys):
-    # Ищем по несуществующему запросу.
+def test_search_templates_ui_no_results(mock_input, isolated_storage, capsys):
+    from breaker.ui.template_editor import search_templates_ui
     search_templates_ui()
     captured = capsys.readouterr()
     assert "ничего не найдено" in captured.out.lower()
