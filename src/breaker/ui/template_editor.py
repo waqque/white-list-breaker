@@ -2,12 +2,13 @@
 # Позволяет пользователю:
 # - Просматривать список сохранённых шаблонов
 # - Создавать новые шаблоны
+# - Удалять пользовательские шаблоны по ID
 # Шаблоны хранятся через TemplateStorage (от Участника Б).
 
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from rich.prompt import Prompt, IntPrompt
+from rich.prompt import Prompt, IntPrompt, Confirm
 
 from breaker.core.schema import ActionType
 from breaker.storage.templates import TemplateStorage, RuleTemplate
@@ -115,12 +116,43 @@ def create_template_ui() -> None:
         console.print(f"\n[red]Ошибка создания шаблона.[/red]")
 
 
+def delete_template_ui() -> None:
+    # Удалить пользовательский шаблон по ID.
+    console.print(Panel(
+        "[bold]Удаление шаблона[/bold]",
+        border_style="red"
+    ))
+
+    list_templates_ui()
+    template_id = Prompt.ask("\nВведите ID шаблона для удаления")
+
+    template = storage.get_template(template_id)
+
+    if template is None:
+        console.print(f"[red]Шаблон {template_id} не найден.[/red]")
+        return
+
+    if template.is_system:
+        console.print(
+            f"[red]Системный шаблон {template_id} нельзя удалить.[/red]"
+        )
+        return
+
+    if Confirm.ask(f"Удалить шаблон [cyan]{template_id}[/cyan] ({template.name})?"):
+        success = storage.delete_template(template_id)
+        if success:
+            console.print(f"[green]Шаблон {template_id} удалён.[/green]")
+        else:
+            console.print(f"[red]Ошибка удаления.[/red]")
+
+
 def main_menu() -> None:
     # Главное меню редактора.
     while True:
         console.print(Panel(
             "[1] Показать все шаблоны\n"
             "[2] Создать шаблон\n"
+            "[3] Удалить шаблон\n"
             "[0] Выход",
             title="Редактор шаблонов",
             border_style="magenta"
@@ -135,6 +167,8 @@ def main_menu() -> None:
             list_templates_ui()
         elif choice == 2:
             create_template_ui()
+        elif choice == 3:
+            delete_template_ui()
         else:
             console.print("[red]Неизвестный пункт.[/red]")
 
