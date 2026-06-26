@@ -1,19 +1,33 @@
 # CLI-редактор шаблонов правил «если–то».
-# Позволяет пользователю просматривать список сохранённых шаблонов.
+# Позволяет пользователю:
+# - Просматривать список сохранённых шаблонов
+# - Создавать новые шаблоны
 # Шаблоны хранятся через TemplateStorage (от Участника Б).
 
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from rich.prompt import IntPrompt
+from rich.prompt import Prompt, IntPrompt
 
-from breaker.storage.templates import TemplateStorage
+from breaker.core.schema import ActionType
+from breaker.storage.templates import TemplateStorage, RuleTemplate
 
 console = Console()
 
 # Глобальный экземпляр хранилища.
 # Пользовательские шаблоны сохраняются в ~/.white-sheet-breaker/templates.json
 storage = TemplateStorage()
+
+
+def _action_type_from_str(choice: str) -> str:
+    # Преобразовать выбор пользователя в строку action_type.
+    # RuleTemplate хранит action_type как str
+    action_type_map = {
+        "1": ActionType.OPEN_FILE.value,
+        "2": ActionType.RUN_SHELL.value,
+        "3": ActionType.CREATE_TEST.value,
+    }
+    return action_type_map[choice]
 
 
 def list_templates_ui() -> None:
@@ -58,11 +72,55 @@ def list_templates_ui() -> None:
     console.print(f"\n[dim]Всего: {len(templates)} шаблонов[/dim]")
 
 
+def create_template_ui() -> None:
+    # Создать новый шаблон.
+    console.print(Panel(
+        "[bold]Создание нового шаблона[/bold]",
+        border_style="green"
+    ))
+
+    name = Prompt.ask("Название шаблона")
+    signal = Prompt.ask("Сигнал (если...)")
+    action = Prompt.ask("Действие (то...)")
+    target = Prompt.ask("Цель (ресурс)")
+    description = Prompt.ask("Описание (необязательно)", default="")
+
+    console.print("\n[bold]Тип действия:[/bold]")
+    console.print("  1. [green]open_file[/green]   — открыть файл")
+    console.print("  2. [green]run_shell[/green]   — выполнить команду")
+    console.print("  3. [green]create_test[/green] — создать тест")
+    choice = Prompt.ask("Номер", choices=["1", "2", "3"], default="1")
+
+    # Генерируем уникальный ID для пользовательского шаблона
+    user_templates = [t for t in storage.list_templates() if not t.is_system]
+    template_id = f"user-{len(user_templates) + 1:03d}"
+
+    new_template = RuleTemplate(
+        id=template_id,
+        name=name,
+        signal=signal,
+        action=action,
+        target=target,
+        action_type=_action_type_from_str(choice),
+        description=description,
+        is_system=False,
+    )
+
+    # Сохраняем через storage (в ~/.white-sheet-breaker/templates.json)
+    success = storage.save_template(new_template)
+
+    if success:
+        console.print(f"\n[green]Шаблон {template_id} создан.[/green]")
+    else:
+        console.print(f"\n[red]Ошибка создания шаблона.[/red]")
+
+
 def main_menu() -> None:
     # Главное меню редактора.
     while True:
         console.print(Panel(
             "[1] Показать все шаблоны\n"
+            "[2] Создать шаблон\n"
             "[0] Выход",
             title="Редактор шаблонов",
             border_style="magenta"
@@ -75,6 +133,8 @@ def main_menu() -> None:
             break
         elif choice == 1:
             list_templates_ui()
+        elif choice == 2:
+            create_template_ui()
         else:
             console.print("[red]Неизвестный пункт.[/red]")
 
