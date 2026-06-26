@@ -3,6 +3,7 @@
 # - Просматривать список сохранённых шаблонов
 # - Создавать новые шаблоны
 # - Удалять пользовательские шаблоны по ID
+# - Искать шаблоны по названию/сигналу
 # Шаблоны хранятся через TemplateStorage (от Участника Б).
 
 from rich.console import Console
@@ -146,6 +147,37 @@ def delete_template_ui() -> None:
             console.print(f"[red]Ошибка удаления.[/red]")
 
 
+def search_templates_ui() -> None:
+    # Поиск шаблонов по названию/сигналу/описанию.
+    console.print(Panel(
+        "[bold]Поиск шаблонов[/bold]",
+        border_style="yellow"
+    ))
+
+    query = Prompt.ask("Введите запрос для поиска")
+    results = storage.search_templates(query)
+
+    if not results:
+        console.print(f"[yellow]По запросу '{query}' ничего не найдено.[/yellow]")
+        return
+
+    table = Table(title=f"Результаты поиска: '{query}'")
+    table.add_column("ID", style="cyan")
+    table.add_column("Название", style="white")
+    table.add_column("Сигнал", style="green")
+    table.add_column("Описание", style="dim")
+
+    for tpl in results:
+        table.add_row(
+            tpl.id,
+            tpl.name,
+            tpl.signal,
+            tpl.description[:50] if tpl.description else "",
+        )
+
+    console.print(table)
+
+
 def main_menu() -> None:
     # Главное меню редактора.
     while True:
@@ -153,6 +185,7 @@ def main_menu() -> None:
             "[1] Показать все шаблоны\n"
             "[2] Создать шаблон\n"
             "[3] Удалить шаблон\n"
+            "[4] Найти шаблон\n"
             "[0] Выход",
             title="Редактор шаблонов",
             border_style="magenta"
@@ -169,6 +202,8 @@ def main_menu() -> None:
             create_template_ui()
         elif choice == 3:
             delete_template_ui()
+        elif choice == 4:
+            search_templates_ui()
         else:
             console.print("[red]Неизвестный пункт.[/red]")
 
