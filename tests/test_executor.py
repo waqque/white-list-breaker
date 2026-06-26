@@ -317,3 +317,83 @@ class TestCreateTest:
         assert result == f"file://{file.resolve()}"
         assert file.exists()
         assert file.read_text() == ""
+
+
+# Расширенные тесты execute_ritual() 
+
+
+class TestExecuteRitualExtended:
+    """Расширенные тесты execute_ritual() для всех типов действий."""
+
+    def test_execute_run_shell_success(self, tmp_path: Path):
+        """execute_ritual() с RUN_SHELL возвращает успешный RitualResult."""
+        ritual = Ritual(
+            signal="нужно запустить тесты",
+            action="выполнить echo",
+            target="echo 'running tests'",
+            action_type=ActionType.RUN_SHELL,
+        )
+
+        result = execute_ritual(ritual)
+
+        assert isinstance(result, RitualResult)
+        assert result.success is True
+        assert result.ritual == ritual
+        assert result.evidence_link.startswith("shell://")
+        assert result.finished_at is not None
+
+    def test_execute_run_shell_error(self, tmp_path: Path):
+        """execute_ritual() с RUN_SHELL и ошибкой — RitualResult с error_message."""
+        ritual = Ritual(
+            signal="команда не работает",
+            action="запустить несуществующую команду",
+            target="nonexistent_command_xyz_12345",
+            action_type=ActionType.RUN_SHELL,
+        )
+
+        result = execute_ritual(ritual)
+
+        assert isinstance(result, RitualResult)
+        assert result.success is False
+        assert result.error_message is not None
+        assert result.finished_at is not None
+
+    def test_execute_create_test_success(self, tmp_path: Path):
+        """execute_ritual() с CREATE_TEST создаёт файл и возвращает успешный RitualResult."""
+        test_file = tmp_path / "test_new.py"
+
+        ritual = Ritual(
+            signal="нет тестов",
+            action="создать тест",
+            target=str(test_file),
+            action_type=ActionType.CREATE_TEST,
+        )
+
+        result = execute_ritual(ritual)
+
+        assert isinstance(result, RitualResult)
+        assert result.success is True
+        assert result.ritual == ritual
+        assert result.evidence_link == f"file://{test_file.resolve()}"
+        assert test_file.exists()
+        assert "def test_placeholder" in test_file.read_text()
+        assert result.finished_at is not None
+
+    def test_execute_create_test_error(self, tmp_path: Path):
+        """execute_ritual() с CREATE_TEST и существующим файлом — ошибка."""
+        test_file = tmp_path / "existing.py"
+        test_file.write_text("# existing")
+
+        ritual = Ritual(
+            signal="нет тестов",
+            action="создать тест",
+            target=str(test_file),
+            action_type=ActionType.CREATE_TEST,
+        )
+
+        result = execute_ritual(ritual)
+
+        assert isinstance(result, RitualResult)
+        assert result.success is False
+        assert "already exists" in result.error_message
+        assert result.finished_at is not None
