@@ -26,19 +26,14 @@ def ask_signal() -> str:
 
     console.print("\n[bold cyan]Вопрос 1 из 3[/bold cyan]")
     console.print(
-        "[dim]Примеры: 'файл пуст', 'не знаю, с чего начать', "
-        "'консоль не запущена'[/dim]"
+        "[dim]Примеры: 'файл пуст', 'не знаю, с чего начать', " "'консоль не запущена'[/dim]"
     )
 
-    signal = Prompt.ask(
-        "[yellow]Какая ситуация блокирует вас?[/yellow]"
-    )
+    signal = Prompt.ask("[yellow]Какая ситуация блокирует вас?[/yellow]")
 
     while not signal.strip():
         console.print("[red]Сигнал не может быть пустым.[/red]")
-        signal = Prompt.ask(
-            "[yellow]Какая ситуация блокирует вас?[/yellow]"
-        )
+        signal = Prompt.ask("[yellow]Какая ситуация блокирует вас?[/yellow]")
 
     return signal.strip()
 
@@ -48,19 +43,13 @@ def ask_action() -> str:
     # Returns: str: Непустая строка с описанием действия
 
     console.print("\n[bold cyan]Вопрос 2 из 3[/bold cyan]")
-    console.print(
-        "[dim]Примеры: 'напишу шаблон функции'[/dim]"
-    )
+    console.print("[dim]Примеры: 'напишу шаблон функции'[/dim]")
 
-    action = Prompt.ask(
-        "[yellow]Что вы сделаете, когда это произойдёт?[/yellow]"
-    )
+    action = Prompt.ask("[yellow]Что вы сделаете, когда это произойдёт?[/yellow]")
 
     while not action.strip():
         console.print("[red]Действие не может быть пустым.[/red]")
-        action = Prompt.ask(
-            "[yellow]Что вы сделаете?[/yellow]"
-        )
+        action = Prompt.ask("[yellow]Что вы сделаете?[/yellow]")
 
     return action.strip()
 
@@ -70,19 +59,13 @@ def ask_target() -> str:
     # Returns: str: Непустая строка с путём к файлу или командой
 
     console.print("\n[bold cyan]Вопрос 3 из 3[/bold cyan]")
-    console.print(
-        "[dim]Примеры: 'main.py', 'tests/test_main.py'[/dim]"
-    )
+    console.print("[dim]Примеры: 'main.py', 'tests/test_main.py'[/dim]")
 
-    target = Prompt.ask(
-        "[yellow]Какой ресурс нужно открыть или команду запустить?[/yellow]"
-    )
+    target = Prompt.ask("[yellow]Какой ресурс нужно открыть или команду запустить?[/yellow]")
 
     while not target.strip():
         console.print("[red]Цель не может быть пустым.[/red]")
-        target = Prompt.ask(
-            "[yellow]Какой ресурс?[/yellow]"
-        )
+        target = Prompt.ask("[yellow]Какой ресурс?[/yellow]")
 
     return target.strip()
 
@@ -90,7 +73,7 @@ def ask_target() -> str:
 def detect_action_type(target: str) -> ActionType:
     # Автоматически определить тип действия по цели.
 
-    """ 
+    """
     Логика:
     - Если target содержит 'test' → CREATE_TEST
     - Если target содержит пробел или команды (npm, python и т.д.) → RUN_SHELL
@@ -128,14 +111,16 @@ def ask_ritual(task_id: str = "demo-task") -> Ritual:
         Ritual: Сформулированное правило «если–то»
     """
 
-    console.print(Panel(
-        "[bold cyan]White-sheet-breaker[/bold cyan]\n\n"
-        "Давай сформулируем правило «если–то» для старта задачи.\n"
-        "Это поможет преодолеть прокрастинацию и начать работу.",
-        title="Начало работы",
-        border_style="cyan",
-        padding=(1, 2)
-    ))
+    console.print(
+        Panel(
+            "[bold cyan]White-sheet-breaker[/bold cyan]\n\n"
+            "Давай сформулируем правило «если–то» для старта задачи.\n"
+            "Это поможет преодолеть прокрастинацию и начать работу.",
+            title="Начало работы",
+            border_style="cyan",
+            padding=(1, 2),
+        )
+    )
 
     signal = ask_signal()
     action = ask_action()
@@ -154,9 +139,9 @@ def ask_ritual(task_id: str = "demo-task") -> Ritual:
 
 
 def confirm_rule(ritual: Ritual) -> bool:
-    #Показать правило и запросить подтверждение.
+    # Показать правило и запросить подтверждение.
 
-    """"
+    """ "
     Args:
         ritual: Сформулированное правило
 
@@ -172,21 +157,20 @@ def confirm_rule(ritual: Ritual) -> bool:
     else:
         rule_text = f"ЕСЛИ {ritual.signal} → ТО {ritual.action}"
 
-    console.print(Panel(
-        f"[bold green]ЕСЛИ:[/bold green]  {ritual.signal}\n"
-        f"[bold blue]ТО:[/bold blue]    {ritual.action}\n"
-        f"[bold yellow]ЦЕЛЬ:[/bold yellow]  {ritual.target}\n\n"
-        f"[dim]Тип действия: {ritual.action_type.value}[/dim]\n"
-        f"[dim]Правило: {rule_text}[/dim]",
-        title="Ваше правило",
-        border_style="green",
-        padding=(1, 2)
-    ))
-
-    return Confirm.ask(
-        "\n[cyan]Подтверждаете правило и готовы начать?[/cyan]",
-        default=True
+    console.print(
+        Panel(
+            f"[bold green]ЕСЛИ:[/bold green]  {ritual.signal}\n"
+            f"[bold blue]ТО:[/bold blue]    {ritual.action}\n"
+            f"[bold yellow]ЦЕЛЬ:[/bold yellow]  {ritual.target}\n\n"
+            f"[dim]Тип действия: {ritual.action_type.value}[/dim]\n"
+            f"[dim]Правило: {rule_text}[/dim]",
+            title="Ваше правило",
+            border_style="green",
+            padding=(1, 2),
+        )
     )
+
+    return Confirm.ask("\n[cyan]Подтверждаете правило и готовы начать?[/cyan]", default=True)
 
 
 def run_dialog(task_id: str = "demo-task") -> "Ritual | None":
@@ -208,14 +192,10 @@ def run_dialog(task_id: str = "demo-task") -> "Ritual | None":
         ritual = ask_ritual(task_id)
 
         if confirm_rule(ritual):
-            console.print(
-                "\n[bold green]Отлично! Правило подтверждено.[/bold green]"
-            )
+            console.print("\n[bold green]Отлично! Правило подтверждено.[/bold green]")
             return ritual
         else:
-            console.print(
-                "[yellow]Хорошо, давайте попробуем ещё раз.[/yellow]"
-            )
+            console.print("[yellow]Хорошо, давайте попробуем ещё раз.[/yellow]")
 
     console.print("[red]Превышено число попыток. Завершаем.[/red]")
     return None
@@ -231,6 +211,7 @@ def _show_templates_list() -> None:
         return
 
     from rich.table import Table
+
     table = Table(title="Доступные шаблоны")
     table.add_column("ID", style="cyan", no_wrap=True)
     table.add_column("Название", style="white")
@@ -275,16 +256,20 @@ def _create_from_template() -> "Ritual | None":
         console.print(f"[red]Шаблон '{template_id}' не найден.[/red]")
         return None
 
-    console.print(Panel(
-        f"[bold]Шаблон:[/bold] {template.name}\n"
-        f"[dim]Сигнал: {template.signal}[/dim]\n"
-        f"[dim]Действие: {template.action}[/dim]\n"
-        f"[dim]Цель: {template.target}[/dim]",
-        title="Выбранный шаблон",
-        border_style="magenta"
-    ))
+    console.print(
+        Panel(
+            f"[bold]Шаблон:[/bold] {template.name}\n"
+            f"[dim]Сигнал: {template.signal}[/dim]\n"
+            f"[dim]Действие: {template.action}[/dim]\n"
+            f"[dim]Цель: {template.target}[/dim]",
+            title="Выбранный шаблон",
+            border_style="magenta",
+        )
+    )
 
-    console.print("\n[dim]Можете скорректировать значения или нажать Enter для использования по умолчанию[/dim]")
+    console.print(
+        "\n[dim]Можете скорректировать значения или нажать Enter для использования по умолчанию[/dim]"
+    )
 
     signal = Prompt.ask("[yellow]Сигнал (если...)[/yellow]", default=template.signal)
     action = Prompt.ask("[yellow]Действие (то...)[/yellow]", default=template.action)
@@ -317,22 +302,26 @@ def main_menu() -> None:
     - Открыть редактор шаблонов
     - Выйти из программы
     """
-    console.print(Panel(
-        "[bold magenta]White-sheet-breaker[/bold magenta]\n\n"
-        "[dim]Инструмент для преодоления прокрастинации через правила «если–то»[/dim]",
-        border_style="magenta",
-        title="Главное меню"
-    ))
+    console.print(
+        Panel(
+            "[bold magenta]White-sheet-breaker[/bold magenta]\n\n"
+            "[dim]Инструмент для преодоления прокрастинации через правила «если–то»[/dim]",
+            border_style="magenta",
+            title="Главное меню",
+        )
+    )
 
     while True:
-        console.print(Panel(
-            "[1] Создать правило с нуля\n"
-            "[2] Использовать готовый шаблон\n"
-            "[3] Управление шаблонами (редактор)\n"
-            "[0] Выход",
-            title="Что хотите сделать?",
-            border_style="cyan"
-        ))
+        console.print(
+            Panel(
+                "[1] Создать правило с нуля\n"
+                "[2] Использовать готовый шаблон\n"
+                "[3] Управление шаблонами (редактор)\n"
+                "[0] Выход",
+                title="Что хотите сделать?",
+                border_style="cyan",
+            )
+        )
 
         try:
             choice = IntPrompt.ask("Выберите пункт", default=0)
@@ -366,6 +355,7 @@ def main_menu() -> None:
         elif choice == 3:
             try:
                 from breaker.ui.template_editor import main_menu as editor_menu
+
                 editor_menu()
             except KeyboardInterrupt:
                 console.print("\n[yellow]Редактор закрыт.[/yellow]")

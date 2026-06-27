@@ -1,4 +1,5 @@
 """Схема данных для White-sheet-breaker."""
+
 from __future__ import annotations
 
 import json
@@ -10,6 +11,7 @@ from typing import Any, Optional
 
 class ActionType(Enum):
     """Типы действий модуля."""
+
     OPEN_FILE = "open_file"
     RUN_SHELL = "run_shell"
     CREATE_TEST = "create_test"
@@ -17,6 +19,7 @@ class ActionType(Enum):
 
 class EventType(Enum):
     """Типы xAPI-событий."""
+
     TASK_STARTED = "task_started"
     PLAN_CREATED = "plan_created"
 
@@ -24,34 +27,35 @@ class EventType(Enum):
 @dataclass
 class Ritual:
     """Правило «если-то» для начала задачи."""
+
     signal: str
     action: str
     target: str
     action_type: ActionType
     task_id: Optional[str] = None
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
-    
+
     def to_dict(self) -> dict:
         data = asdict(self)
         data["action_type"] = self.action_type.value
         return data
-    
+
     def to_json(self, indent: int = 2) -> str:
         return json.dumps(self.to_dict(), ensure_ascii=False, indent=indent)
-    
+
     @classmethod
     def from_dict(cls, data: dict) -> "Ritual":
         data = data.copy()
         data["action_type"] = ActionType(data["action_type"])
         return cls(**data)
-    
+
     @classmethod
     def from_json(cls, json_str: str) -> "Ritual":
         return cls.from_dict(json.loads(json_str))
-    
+
     def format_rule(self) -> str:
         return f"ЕСЛИ {self.signal} → ТО {self.action}"
-    
+
     def validate(self) -> list[str]:
         errors = []
         if not self.signal.strip():
@@ -63,7 +67,7 @@ class Ritual:
         if not isinstance(self.action_type, ActionType):
             errors.append(f"Невалидный тип действия: {self.action_type}")
         return errors
-    
+
     def is_valid(self) -> bool:
         return len(self.validate()) == 0
 
@@ -71,13 +75,14 @@ class Ritual:
 @dataclass
 class RitualResult:
     """Результат выполнения ритуала."""
+
     ritual: Ritual
     success: bool
     evidence_link: Optional[str] = None
     error_message: Optional[str] = None
     started_at: str = field(default_factory=lambda: datetime.now().isoformat())
     finished_at: Optional[str] = None
-    
+
     def to_dict(self) -> dict:
         return {
             "ritual": self.ritual.to_dict(),
@@ -87,10 +92,10 @@ class RitualResult:
             "started_at": self.started_at,
             "finished_at": self.finished_at,
         }
-    
+
     def to_json(self, indent: int = 2) -> str:
         return json.dumps(self.to_dict(), ensure_ascii=False, indent=indent)
-    
+
     def mark_finished(self) -> None:
         self.finished_at = datetime.now().isoformat()
 
@@ -98,9 +103,10 @@ class RitualResult:
 @dataclass
 class XapiActor:
     """Актор xAPI-стейтмента (ученик)."""
+
     mbox: str
     name: str
-    
+
     def to_dict(self) -> dict:
         return {"mbox": self.mbox, "name": self.name}
 
@@ -108,19 +114,20 @@ class XapiActor:
 @dataclass
 class XapiVerb:
     """Глагол xAPI-стейтмента."""
+
     id: str
     display: dict[str, str] = field(default_factory=lambda: {"en-US": "launched"})
-    
+
     def to_dict(self) -> dict:
         return {"id": self.id, "display": self.display}
-    
+
     @classmethod
     def launched(cls) -> "XapiVerb":
         return cls(
             id="http://adlnet.gov/expapi/verbs/launched",
             display={"en-US": "launched", "ru-RU": "начал"},
         )
-    
+
     @classmethod
     def planned(cls) -> "XapiVerb":
         return cls(
@@ -132,12 +139,13 @@ class XapiVerb:
 @dataclass
 class XapiObject:
     """Объект xAPI-стейтмента (задача)."""
+
     id: str
     definition: dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> dict:
         return {"id": self.id, "definition": self.definition}
-    
+
     @classmethod
     def from_task(cls, task_id: str, task_name: str) -> "XapiObject":
         return cls(
@@ -149,15 +157,14 @@ class XapiObject:
 @dataclass
 class XapiContext:
     """Контекст xAPI-стейтмента (курс, навык)."""
+
     course_id: Optional[str] = None
     skill_id: Optional[str] = None
-    
+
     def to_dict(self) -> dict:
         context: dict[str, Any] = {}
         if self.course_id:
-            context["contextActivities"] = {
-                "parent": [{"id": f"course:{self.course_id}"}]
-            }
+            context["contextActivities"] = {"parent": [{"id": f"course:{self.course_id}"}]}
         if self.skill_id:
             context.setdefault("extensions", {})
             context["extensions"]["skill:id"] = self.skill_id
@@ -167,13 +174,14 @@ class XapiContext:
 @dataclass
 class XapiStatement:
     """Полный xAPI-стейтмент по стандарту ADL."""
+
     actor: XapiActor
     verb: XapiVerb
     object: XapiObject
     result: dict[str, Any]
     context: Optional[XapiContext] = None
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
-    
+
     def to_dict(self) -> dict:
         statement = {
             "actor": self.actor.to_dict(),
@@ -187,10 +195,10 @@ class XapiStatement:
             if ctx_dict:
                 statement["context"] = ctx_dict
         return statement
-    
+
     def to_json(self, indent: int = 2) -> str:
         return json.dumps(self.to_dict(), ensure_ascii=False, indent=indent)
-    
+
     @classmethod
     def from_ritual_result(
         cls,
@@ -201,12 +209,12 @@ class XapiStatement:
     ) -> "XapiStatement":
         """Создать xAPI-стейтмент из результата выполнения ритуала."""
         ritual = result.ritual
-        
+
         verb = XapiVerb.launched() if event_type == EventType.TASK_STARTED else XapiVerb.planned()
-        
+
         task_id = ritual.task_id or "unknown"
         obj = XapiObject.from_task(task_id, ritual.signal)
-        
+
         result_dict: dict[str, Any] = {
             "success": result.success,
             "response": ritual.format_rule(),
@@ -220,9 +228,9 @@ class XapiStatement:
             result_dict["extensions"]["evidenceLink"] = result.evidence_link
         if result.error_message:
             result_dict["extensions"]["errorMessage"] = result.error_message
-        
+
         context = XapiContext(course_id=course_id) if course_id else None
-        
+
         return cls(
             actor=actor,
             verb=verb,
