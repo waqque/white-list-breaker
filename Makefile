@@ -78,9 +78,22 @@ install-dev: ## Установить зависимости + инструмен
 	@test -f requirements.txt || (echo "Файл requirements.txt не найден." && exit 1)
 	pip install -r requirements.txt
 	pip install pytest pytest-cov flake8 black
-test: ## Запустить модульные тесты (pytest tests/)
-	# TODO: $(PYTHON) -m pytest $(TESTS_DIR) -v
-	@echo "[test] not implemented yet"
+test: ## Запустить все тесты
+	$(PYTHON) -m pytest $(TESTS_DIR) -v
+
+test-core: ## Запустить тесты ядра (schema, tracker, xapi)
+	$(PYTHON) -m pytest $(TESTS_DIR)/test_schema.py \
+	                   $(TESTS_DIR)/test_tracker.py \
+	                   $(TESTS_DIR)/test_xapi.py -v
+
+test-engine: ## Запустить тесты движка (executor, templates)
+	$(PYTHON) -m pytest $(TESTS_DIR)/test_executor.py \
+	                   $(TESTS_DIR)/test_templates.py -v
+
+test-ui: ## Запустить тесты UI (dialog, timer)
+	$(PYTHON) -m pytest $(TESTS_DIR)/test_dialog.py \
+	                   $(TESTS_DIR)/test_timer.py -v
+
 
 
 demo: ## Демонстрация работы модуля (пример задачи + правило + шаг)
