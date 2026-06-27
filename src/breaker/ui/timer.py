@@ -2,6 +2,7 @@
 # После подтверждения правила «если–то» пользователь сам выбирает, сколько минут работать.
 # Таймер помогает сосредоточиться и не отвлекаться.
 
+import os
 import time
 import subprocess
 import sys
@@ -27,12 +28,59 @@ def _format_seconds(seconds: int) -> str:
     return f"{minutes:02d}:{secs:02d}"
 
 
+def _is_wsl() -> bool:
+    # Определить, запущен ли код в WSL (Windows Subsystem for Linux)
+    # переменная окружения WSL_DISTRO_NAME
+    if os.environ.get("WSL_DISTRO_NAME"):
+        return True
+
+    # /proc/version содержит "Microsoft" или "WSL"
+    try:
+        with open("/proc/version", "r", encoding="utf-8") as f:
+            version = f.read().lower()
+            if "microsoft" in version or "wsl" in version:
+                return True
+    except (OSError, IOError):
+        pass
+
+    return False
+
+
+def _linux_path_to_windows(linux_path: Path) -> str:
+    # Конвертировать Linux-путь в Windows-путь через wslpath.
+    try:
+        result = subprocess.run(
+            ["wslpath", "-w", str(linux_path)],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    # Fallback: ручная конвертация /mnt/c/... → C:\...
+    path_str = str(linux_path)
+    if path_str.startswith("/mnt/"):
+        # /mnt/c/Users/... → C:\Users\...
+        drive = path_str[5].upper()
+        rest = path_str[7:].replace("/", "\\")
+        return f"{drive}:\\{rest}"
+
+    return path_str
+
+
 def _play_sound() -> None:
-    """Воспроизвести звуковой сигнал (кроссплатформенно)."""
+    """Воспроизвести звуковой сигнал (кроссплатформенно, включая WSL)."""
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
     sound_path = base_dir / "data" / "sounds" / "wow-sound-effect.wav"
-    
-    
+
+    # Проверка на WSL — используем Windows-механизмы
+    if _is_wsl():
+        _play_sound_wsl(sound_path)
+        return
+
     try:
         if sound_path.exists():
             if sys.platform == "darwin":  # macOS
@@ -71,6 +119,33 @@ def _play_sound() -> None:
         _play_system_sound()
 
 
+def _play_sound_wsl(sound_path: Path) -> None:
+    """Воспроизвести звук в WSL через Windows PowerShell."""
+    try:
+        # Конвертируем Linux-путь в Windows-путь
+        if sound_path.exists():
+            windows_path = _linux_path_to_windows(sound_path)
+            # Экранируем обратные слеши для PowerShell
+            windows_path_escaped = windows_path.replace("\\", "\\\\")
+
+            # Вызываем powershell.exe (он доступен из WSL!)
+            subprocess.run(
+                [
+                    "powershell.exe", "-c",
+                    f'(New-Object Media.SoundPlayer "{windows_path_escaped}").PlaySync()'
+                ],
+                capture_output=True,
+                timeout=10,
+            )
+            return
+        else:
+            console.print(f"[yellow]Звуковой файл не найден: {sound_path}[/yellow]")
+            _play_system_sound_wsl()
+    except Exception as e:
+        console.print(f"[dim]Ошибка воспроизведения в WSL: {e}[/dim]")
+        _play_system_sound_wsl()
+
+
 def _play_system_sound() -> None:
     # Воспроизвести системный звук ОС (если свой не найден)
     try:
@@ -86,6 +161,20 @@ def _play_system_sound() -> None:
         else:
             print("\a", end="", flush=True)
     except Exception:
+        print("\a", end="", flush=True)
+
+
+def _play_system_sound_wsl() -> None:
+    """Системный звук в WSL через Windows."""
+    try:
+        # Используем стандартный Windows beep через PowerShell
+        subprocess.run(
+            ["powershell.exe", "-c", "[Console]::Beep(1000, 500)"],
+            capture_output=True,
+            timeout=5,
+        )
+    except Exception:
+        # Последний fallback — bell символ
         print("\a", end="", flush=True)
 
 
@@ -172,7 +261,6 @@ def pomodoro_timer(minutes: int = 5) -> bool:
     ))
 
     return True
-
 
 
 def run_timer_with_prompt() -> bool:
