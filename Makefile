@@ -1,4 +1,3 @@
-
 PYTHON       ?= python3
 MODULE       := breaker
 SRC_DIR      := src/$(MODULE)
@@ -18,7 +17,9 @@ LRS_MODE     ?= mock
 .DEFAULT_GOAL := help
 .PHONY: help \
         init init-dirs init-files \
-        install test demo run-cli run-api \
+        install install-dev \
+        test test-core test-engine test-ui test-cov \
+        demo run-cli run-api \
         docker-build docker-up docker-down \
         clean logs
 
@@ -78,6 +79,7 @@ install-dev: ## Установить зависимости + инструмен
 	@test -f requirements.txt || (echo "Файл requirements.txt не найден." && exit 1)
 	pip install -r requirements.txt
 	pip install pytest pytest-cov flake8 black
+
 test: ## Запустить все тесты
 	$(PYTHON) -m pytest $(TESTS_DIR) -v
 
@@ -94,32 +96,24 @@ test-ui: ## Запустить тесты UI (dialog, timer)
 	$(PYTHON) -m pytest $(TESTS_DIR)/test_dialog.py \
 	                   $(TESTS_DIR)/test_timer.py -v
 
-
-
 demo: ## Демонстрация работы модуля (пример задачи + правило + шаг)
-	# TODO: LRS_MODE=mock $(PYTHON) -m $(MODULE) --demo
-	@echo "[demo] not implemented yet"
-
+	LRS_MODE=mock $(PYTHON) -m $(MODULE) --demo
 
 run-cli: ## Запустить CLI-интерфейс модуля
-	# TODO: LRS_MODE=$(LRS_MODE) $(PYTHON) -m $(MODULE)
-	@echo "[run-cli] not implemented yet"
+	LRS_MODE=$(LRS_MODE) $(PYTHON) -m $(MODULE)
 
-run-api: ## Запустить REST API сервер 
-	# TODO: REST API не реализован в MVP
-	@echo "[run-api] not implemented yet (не в MVP)"
+run-api: ## REST API сервер (не в MVP)
+	@echo " REST API не реализован в MVP. Используйте 'make run-cli'."
+	@exit 1
 
 docker-build: ## Собрать Docker-контейнер
-	# TODO: docker build -t white-sheet-breaker:latest .
-	@echo "[docker-build] not implemented yet"
+	docker build -t white-sheet-breaker:latest .
 
 docker-up: ## Поднять контейнер/сервис
-	# TODO: docker-compose up -d
-	@echo "[docker-up] not implemented yet"
+	docker-compose up -d
 
 docker-down: ## Остановить контейнер
-	# TODO: docker-compose down
-	@echo "[docker-down] not implemented yet"
+	docker-compose down
 
 
 clean: ## Очистить артефакты: __pycache__, .pytest_cache, htmlcov
@@ -132,3 +126,10 @@ clean: ## Очистить артефакты: __pycache__, .pytest_cache, htmlc
 logs: ## Показать последние 50 строк лога (logs/breaker.log)
 	@test -f $(LOGS_DIR)/breaker.log || (echo "Лог ещё не создан." && exit 0)
 	tail -n 50 $(LOGS_DIR)/breaker.log
+
+help: ## Показать список команд
+	@echo "============================================================"
+	@echo "  White-sheet-breaker — доступные команды"
+	@echo "============================================================"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
+		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'

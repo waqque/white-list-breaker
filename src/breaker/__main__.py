@@ -1,1 +1,4 @@
-# Entry point: python -m breaker
+from breaker.main import main
+
+if __name__ == "__main__":
+    main()
