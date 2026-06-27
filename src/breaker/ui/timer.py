@@ -29,27 +29,26 @@ def _format_seconds(seconds: int) -> str:
 
 def _play_sound() -> None:
     # Воспроизвести звуковой сигнал
-    sound_path = Path("data/sounds/wow-sound-effect.mp3")
+    base_dir = Path(__file__).resolve().parent.parent.parent.parent
+    sound_path = base_dir / "data" / "sounds" / "wow-sound-effect.wav"
 
     try:
         if sound_path.exists():
-            if sys.platform == "darwin": # macos
+            if sys.platform == "darwin":  # macOS
                 subprocess.run(
                     ["afplay", str(sound_path)],
                     capture_output=True,
                     timeout=10,
                 )
-            elif sys.platform == "win32": # win 
-                subprocess.run(
-                    [
-                        "powershell", "-c",
-                        f'(New-Object Media.SoundPlayer "{sound_path}").PlaySync()'
-                    ],
-                    capture_output=True,
-                    timeout=10,
+            elif sys.platform == "win32":  # Windows
+                # Используем winsound вместо PowerShell (надёжнее для WAV)
+                import winsound
+                winsound.PlaySound(
+                    str(sound_path),
+                    winsound.SND_FILENAME | winsound.SND_ASYNC
                 )
-            else:
-                for player in ["mpv", "ffplay", "aplay"]: # linux
+            else:  # Linux
+                for player in ["paplay", "mpv", "ffplay", "aplay"]:
                     try:
                         subprocess.run(
                             [player, str(sound_path)],
@@ -60,8 +59,10 @@ def _play_sound() -> None:
                     except FileNotFoundError:
                         continue
         else:
+            console.print(f"[yellow]Звуковой файл не найден: {sound_path}[/yellow]")
             _play_system_sound()
-    except (subprocess.TimeoutExpired, Exception):
+    except Exception as e:
+        console.print(f"[dim]Ошибка воспроизведения: {e}[/dim]")
         print("\a", end="", flush=True)
 
 
@@ -158,7 +159,15 @@ def pomodoro_timer(minutes: int = 5) -> bool:
 
     _play_sound()
 
+    console.print(Panel(
+        "[bold green]ВРЕМЯ ВЫШЛО![/bold green]\n\n"
+        "[dim]Микро-шаг выполнен. Отдохни 5 минут.[/dim]",
+        border_style="green",
+        title="Pomodoro"
+    ))
+
     return True
+
 
 
 def run_timer_with_prompt() -> bool:
