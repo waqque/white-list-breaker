@@ -28,10 +28,11 @@ def _format_seconds(seconds: int) -> str:
 
 
 def _play_sound() -> None:
-    # Воспроизвести звуковой сигнал
+    """Воспроизвести звуковой сигнал (кроссплатформенно)."""
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
     sound_path = base_dir / "data" / "sounds" / "wow-sound-effect.wav"
-
+    
+    
     try:
         if sound_path.exists():
             if sys.platform == "darwin":  # macOS
@@ -41,11 +42,14 @@ def _play_sound() -> None:
                     timeout=10,
                 )
             elif sys.platform == "win32":  # Windows
-                # Используем winsound вместо PowerShell (надёжнее для WAV)
-                import winsound
-                winsound.PlaySound(
-                    str(sound_path),
-                    winsound.SND_FILENAME | winsound.SND_ASYNC
+                # Используем PowerShell с SoundPlayer (надёжнее для WAV)
+                subprocess.run(
+                    [
+                        "powershell", "-c",
+                        f'(New-Object Media.SoundPlayer "{sound_path}").PlaySync()'
+                    ],
+                    capture_output=True,
+                    timeout=10,
                 )
             else:  # Linux
                 for player in ["paplay", "mpv", "ffplay", "aplay"]:
@@ -63,7 +67,8 @@ def _play_sound() -> None:
             _play_system_sound()
     except Exception as e:
         console.print(f"[dim]Ошибка воспроизведения: {e}[/dim]")
-        print("\a", end="", flush=True)
+        # Fallback на системный звук
+        _play_system_sound()
 
 
 def _play_system_sound() -> None:
