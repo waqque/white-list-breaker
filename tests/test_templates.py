@@ -8,8 +8,8 @@
 - Поиск шаблонов по названию/описанию
 - Сортировку списка шаблонов
 
-Все тесты используют tmp_path — файлы создаются во временной директории
-и НЕ попадают в репозиторий.
+Все тесты изолированы — передают user_file явно,
+чтобы не зависеть от реального ~/.white-sheet-breaker/templates.json.
 """
 
 import pytest
@@ -18,7 +18,7 @@ from pathlib import Path
 from breaker.storage.templates import RuleTemplate, TemplateStorage
 
 
-# ─── Тесты для RuleTemplate ──────────────────────────────────────────
+# Тесты для RuleTemplate 
 
 
 class TestRuleTemplate:
@@ -38,7 +38,7 @@ class TestRuleTemplate:
         assert template.id == "test_template"
         assert template.name == "Тестовый шаблон"
         assert template.action_type == "open_file"
-        assert template.created_at  # время установлено автоматически
+        assert template.created_at
         assert not template.is_system
     
     def test_create_template_with_all_fields(self):
@@ -114,7 +114,7 @@ class TestRuleTemplate:
         assert template.created_at == "2026-06-26T10:00:00"
 
 
-# ─── Тесты для TemplateStorage ───────────────────────────────────────
+# Тесты для TemplateStorage
 
 
 class TestTemplateStorage:
@@ -136,7 +136,13 @@ class TestTemplateStorage:
             ]
         }))
         
-        storage = TemplateStorage(system_file=str(system_file))
+        user_file = tmp_path / "user.json"
+        user_file.write_text('{"templates": []}')
+        
+        storage = TemplateStorage(
+            system_file=str(system_file),
+            user_file=str(user_file),
+        )
         templates = storage.list_templates()
         
         assert len(templates) == 1
@@ -147,6 +153,7 @@ class TestTemplateStorage:
         """Если системного файла нет — хранилище работает."""
         system_file = tmp_path / "nonexistent.json"
         user_file = tmp_path / "user.json"
+        user_file.write_text('{"templates": []}')
         
         storage = TemplateStorage(
             system_file=str(system_file),
@@ -181,7 +188,6 @@ class TestTemplateStorage:
         assert result is True
         assert user_file.exists()
         
-        # Проверяем, что шаблон сохранился
         loaded = storage.get_template("user_1")
         assert loaded is not None
         assert loaded.name == "User Template"
@@ -197,7 +203,6 @@ class TestTemplateStorage:
             user_file=str(user_file),
         )
         
-        # Создаём шаблон
         template = RuleTemplate(
             id="to_delete",
             name="To Delete",
@@ -208,7 +213,6 @@ class TestTemplateStorage:
         )
         storage.save_template(template)
         
-        # Удаляем
         result = storage.delete_template("to_delete")
         
         assert result is True
@@ -230,7 +234,13 @@ class TestTemplateStorage:
             ]
         }))
         
-        storage = TemplateStorage(system_file=str(system_file))
+        user_file = tmp_path / "user.json"
+        user_file.write_text('{"templates": []}')
+        
+        storage = TemplateStorage(
+            system_file=str(system_file),
+            user_file=str(user_file),
+        )
         result = storage.delete_template("sys_1")
         
         assert result is False
@@ -252,10 +262,16 @@ class TestTemplateStorage:
             ]
         }))
         
-        storage = TemplateStorage(system_file=str(system_file))
+        user_file = tmp_path / "user.json"
+        user_file.write_text('{"templates": []}')
+        
+        storage = TemplateStorage(
+            system_file=str(system_file),
+            user_file=str(user_file),
+        )
         
         template = RuleTemplate(
-            id="sys_1",  # Тот же ID
+            id="sys_1",
             name="Overwrite Attempt",
             signal="new signal",
             action="new action",
@@ -266,7 +282,6 @@ class TestTemplateStorage:
         result = storage.save_template(template)
         
         assert result is False
-        # Системный шаблон не изменился
         loaded = storage.get_template("sys_1")
         assert loaded.name == "System"
     
@@ -294,7 +309,13 @@ class TestTemplateStorage:
             ]
         }))
         
-        storage = TemplateStorage(system_file=str(system_file))
+        user_file = tmp_path / "user.json"
+        user_file.write_text('{"templates": []}')
+        
+        storage = TemplateStorage(
+            system_file=str(system_file),
+            user_file=str(user_file),
+        )
         results = storage.search_templates("test")
         
         assert len(results) == 1
@@ -317,7 +338,13 @@ class TestTemplateStorage:
             ]
         }))
         
-        storage = TemplateStorage(system_file=str(system_file))
+        user_file = tmp_path / "user.json"
+        user_file.write_text('{"templates": []}')
+        
+        storage = TemplateStorage(
+            system_file=str(system_file),
+            user_file=str(user_file),
+        )
         results = storage.search_templates("unique_keyword")
         
         assert len(results) == 1
@@ -339,7 +366,13 @@ class TestTemplateStorage:
             ]
         }))
         
-        storage = TemplateStorage(system_file=str(system_file))
+        user_file = tmp_path / "user.json"
+        user_file.write_text('{"templates": []}')
+        
+        storage = TemplateStorage(
+            system_file=str(system_file),
+            user_file=str(user_file),
+        )
         results = storage.search_templates("файл")
         
         assert len(results) == 1
@@ -368,7 +401,13 @@ class TestTemplateStorage:
             ]
         }))
         
-        storage = TemplateStorage(system_file=str(system_file))
+        user_file = tmp_path / "user.json"
+        user_file.write_text('{"templates": []}')
+        
+        storage = TemplateStorage(
+            system_file=str(system_file),
+            user_file=str(user_file),
+        )
         templates = storage.list_templates()
         
         assert templates[0].name == "Apple"
@@ -379,7 +418,13 @@ class TestTemplateStorage:
         system_file = tmp_path / "system.json"
         system_file.write_text('{"templates": []}')
         
-        storage = TemplateStorage(system_file=str(system_file))
+        user_file = tmp_path / "user.json"
+        user_file.write_text('{"templates": []}')
+        
+        storage = TemplateStorage(
+            system_file=str(system_file),
+            user_file=str(user_file),
+        )
         result = storage.get_template("nonexistent")
         
         assert result is None
@@ -389,7 +434,13 @@ class TestTemplateStorage:
         system_file = tmp_path / "system.json"
         system_file.write_text('{"templates": []}')
         
-        storage = TemplateStorage(system_file=str(system_file))
+        user_file = tmp_path / "user.json"
+        user_file.write_text('{"templates": []}')
+        
+        storage = TemplateStorage(
+            system_file=str(system_file),
+            user_file=str(user_file),
+        )
         result = storage.delete_template("nonexistent")
         
         assert result is False
@@ -400,7 +451,6 @@ class TestTemplateStorage:
         system_file.write_text('{"templates": []}')
         user_file = tmp_path / "user.json"
         
-        # Первая сессия — сохраняем шаблон
         storage1 = TemplateStorage(
             system_file=str(system_file),
             user_file=str(user_file),
@@ -415,7 +465,6 @@ class TestTemplateStorage:
         )
         storage1.save_template(template)
         
-        # Вторая сессия — загружаем из файла
         storage2 = TemplateStorage(
             system_file=str(system_file),
             user_file=str(user_file),

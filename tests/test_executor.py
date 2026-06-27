@@ -144,7 +144,7 @@ class TestExecuteRitual:
     """Тесты интеграции executor со schema.py."""
 
     def test_execute_open_file_success(self, tmp_path: Path):
-        """execute_ritual() с OPEN_FILE возвращает RitualResult."""
+        """execute_ritual() с OPEN_FILE возвращает успешный RitualResult."""
         file = tmp_path / "example.py"
         file.write_text("# test")
 
@@ -155,7 +155,7 @@ class TestExecuteRitual:
             action_type=ActionType.OPEN_FILE,
         )
 
-        with patch("breaker.engine.executor._open_system_default") as mock_open:
+        with patch("breaker.engine.executor._open_in_editor") as mock_open:
             mock_open.return_value = f"file://{file.resolve()}"
             result = execute_ritual(ritual)
 
