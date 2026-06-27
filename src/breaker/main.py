@@ -19,12 +19,12 @@ def run_demo():
     """Демонстрация работы ядра без UI (с тестовым правилом)."""
     print("🎬 Запуск демонстрации White-sheet-breaker...\n")
     
-    # Создаём тестовый ритуал
+    # Создаём тестовый ритуал с create_test (не требует существующего файла)
     ritual = Ritual(
-        signal="открываю пустой файл",
-        action="напишу шаблон функции",
-        target="example.py",
-        action_type=ActionType.OPEN_FILE,
+        signal="нужно написать тест",
+        action="создам шаблон теста",
+        target="demo_test.py",  # Новый файл, который будет создан
+        action_type=ActionType.CREATE_TEST,
         task_id="demo-task",
     )
     print(f"📝 Тестовое правило: {ritual.format_rule()}")
@@ -44,60 +44,59 @@ def run_demo():
     
     print("\n✅ Демонстрация завершена.")
 
-
 def run_full_cycle():
     """Полный цикл: Диалог -> Исполнение -> Таймер -> Лог -> xAPI."""
-    print("🎯 Запуск White-sheet-breaker...\n")
+    print(" Запуск White-sheet-breaker...\n")
 
     # 1. UI: Получаем правило от пользователя (с подтверждением)
     try:
         ritual = run_dialog()
     except KeyboardInterrupt:
-        print("\n\n🚫 Прервано пользователем.")
+        print("\n\nПрервано пользователем.")
         return
     except Exception as e:
-        print(f"❌ Ошибка в диалоге: {e}")
+        print(f"Ошибка в диалоге: {e}")
         return
 
     if ritual is None:
-        print("🚫 Пользователь отменил действие.")
+        print(" Пользователь отменил действие.")
         return
 
-    print(f"✅ Правило принято: {ritual.format_rule()}\n")
+    print(f"Правило принято: {ritual.format_rule()}\n")
 
     # 2. Engine: Выполняем микро-шаг
-    print("⚙️  Выполняю действие...")
+    print("Выполняю действие...")
     try:
         result = execute_ritual(ritual)
     except Exception as e:
-        print(f"❌ Ошибка при выполнении: {e}")
+        print(f" Ошибка при выполнении: {e}")
         return
 
     # 3. UI: Запускаем Pomodoro-таймер (если действие успешно)
     if result.success:
-        print("\n🍅 Теперь сосредоточься на задаче!")
+        print("\nТеперь сосредоточься на задаче!")
         try:
             timer_completed = run_timer_with_prompt()
             if timer_completed:
-                print("🎉 Pomodoro завершён!")
+                print("Pomodoro завершён!")
             else:
-                print("⏸️ Pomodoro прерван.")
+                print("Pomodoro прерван.")
         except Exception as e:
-            print(f"⚠️ Ошибка таймера: {e}")
+            print(f"Ошибка таймера: {e}")
 
     # 4. Core: Логируем результат
     log_file = log_ritual_result(result)
-    print(f"📝 Результат записан в лог: {log_file}")
+    print(f"Результат записан в лог: {log_file}")
 
     # 5. Core: Отправляем xAPI-стейтмент
-    print("📡 Отправка события в LRS...")
+    print("Отправка события в LRS...")
     config = LrsConfig.from_env()
     success = send_statement(result, config)
     
     if success:
-        print("\n✅ Ритуал успешно завершён!")
+        print("\nРитуал успешно завершён!")
     else:
-        print("\n⚠️ Ритуал выполнен, но не удалось отправить событие в LRS.")
+        print("\nРитуал выполнен, но не удалось отправить событие в LRS.")
 
 
 def main():
