@@ -22,21 +22,26 @@ def isolated_storage(tmp_path):
 
 def test_list_templates_ui_with_data(isolated_storage, capsys):
     from breaker.ui.template_editor import list_templates_ui
+
     list_templates_ui()
     captured = capsys.readouterr()
     assert "Список сохранённых шаблонов" in captured.out
 
 
-@patch('rich.prompt.Prompt.ask', side_effect=[
-    'Тестовый шаблон',
-    'тест сигнал',
-    'тест действие',
-    'test.py',
-    'тест описание',
-    '1',
-])
+@patch(
+    "rich.prompt.Prompt.ask",
+    side_effect=[
+        "Тестовый шаблон",
+        "тест сигнал",
+        "тест действие",
+        "test.py",
+        "тест описание",
+        "1",
+    ],
+)
 def test_create_template_ui(mock_input, isolated_storage, capsys):
     from breaker.ui.template_editor import create_template_ui
+
     initial_count = len(isolated_storage.list_templates())
     create_template_ui()
     final_count = len(isolated_storage.list_templates())
@@ -45,10 +50,11 @@ def test_create_template_ui(mock_input, isolated_storage, capsys):
     assert "создан" in captured.out
 
 
-@patch('rich.prompt.Prompt.ask', return_value='user-999')
-@patch('rich.prompt.Confirm.ask', return_value=True)
+@patch("rich.prompt.Prompt.ask", return_value="user-999")
+@patch("rich.prompt.Confirm.ask", return_value=True)
 def test_delete_template_ui_user_template(mock_confirm, mock_input, isolated_storage, capsys):
     from breaker.ui.template_editor import delete_template_ui
+
     test_template = RuleTemplate(
         id="user-999",
         name="Тест",
@@ -65,25 +71,28 @@ def test_delete_template_ui_user_template(mock_confirm, mock_input, isolated_sto
     assert "удалён" in captured.out
 
 
-@patch('rich.prompt.Prompt.ask', return_value='run_linter')
+@patch("rich.prompt.Prompt.ask", return_value="run_linter")
 def test_delete_template_ui_system_template(mock_input, isolated_storage, capsys):
     from breaker.ui.template_editor import delete_template_ui
+
     delete_template_ui()
     captured = capsys.readouterr()
     assert "нельзя удалить" in captured.out.lower()
 
 
-@patch('rich.prompt.Prompt.ask', return_value='файл')
+@patch("rich.prompt.Prompt.ask", return_value="файл")
 def test_search_templates_ui(mock_input, isolated_storage, capsys):
     from breaker.ui.template_editor import search_templates_ui
+
     search_templates_ui()
     captured = capsys.readouterr()
     assert "Результаты поиска" in captured.out
 
 
-@patch('rich.prompt.Prompt.ask', return_value='несуществующий_запрос_xyz')
+@patch("rich.prompt.Prompt.ask", return_value="несуществующий_запрос_xyz")
 def test_search_templates_ui_no_results(mock_input, isolated_storage, capsys):
     from breaker.ui.template_editor import search_templates_ui
+
     search_templates_ui()
     captured = capsys.readouterr()
     assert "ничего не найдено" in captured.out.lower()

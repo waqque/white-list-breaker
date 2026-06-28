@@ -1,9 +1,9 @@
 """Тесты для engine/executor.py.
 
 Проверяют:
-- Кроссплатформенность open_file() 
-- Интеграцию со schema.py 
-- Обработку ошибок 
+- Кроссплатформенность open_file()
+- Интеграцию со schema.py
+- Обработку ошибок
 """
 
 import platform
@@ -23,8 +23,8 @@ from breaker.engine.exceptions import (
 
 from breaker.core.schema import Ritual, ActionType, RitualResult
 
-
 # Тесты для open_file()
+
 
 class TestOpenFile:
     """Тесты функции open_file."""
@@ -33,27 +33,27 @@ class TestOpenFile:
         """Если файла нет — BreakerFileNotFoundError."""
         missing = tmp_path / "does_not_exist.txt"
         assert not missing.exists()
-        
+
         with pytest.raises(BreakerFileNotFoundError) as exc_info:
             open_file(missing)
-        
+
         assert "Файл не найден" in str(exc_info.value)
 
     def test_directory_raises(self, tmp_path: Path):
         """Если указан путь к директории — ошибка."""
         directory = tmp_path / "some_dir"
         directory.mkdir()
-        
+
         with pytest.raises(BreakerFileNotFoundError) as exc_info:
             open_file(directory)
-        
+
         assert "директории" in str(exc_info.value)
 
     def test_empty_path_raises(self):
         """Пустой путь — ValueError."""
         with pytest.raises(ValueError) as exc_info:
             open_file("")
-        
+
         assert "cannot be empty" in str(exc_info.value)
 
     def test_open_with_vscode(self, tmp_path: Path):
@@ -174,7 +174,8 @@ class TestOpenFile:
                 open_file(file, editor=None)
 
 
-# Тесты для execute_ritual() 
+# Тесты для execute_ritual()
+
 
 class TestExecuteRitual:
     """Тесты интеграции executor со schema.py."""
@@ -204,7 +205,7 @@ class TestExecuteRitual:
     def test_execute_open_file_error(self, tmp_path: Path):
         """execute_ritual() с ошибкой возвращает RitualResult с error_message."""
         file = tmp_path / "example.py"
-        file.write_text("# test") 
+        file.write_text("# test")
 
         ritual = Ritual(
             signal="файл пуст",
@@ -222,22 +223,21 @@ class TestExecuteRitual:
             assert "Editor not found" in result.error_message
             assert result.finished_at is not None
 
-# Тесты для run_shell() 
+
+# Тесты для run_shell()
 
 
 class TestRunShell:
 
     def test_simple_command_succeeds(self):
-        """Простая команда (echo) """
+        """Простая команда (echo)"""
         result = run_shell("echo 'hello'")
         assert result == "shell://echo 'hello'"
 
     def test_command_with_cwd(self, tmp_path: Path):
         """Команда выполняется в указанной директории."""
         # Используем python -c вместо pwd для кроссплатформенности
-        result = run_shell(
-            "python -c \"import os; print(os.getcwd())\"", cwd=tmp_path
-        )
+        result = run_shell('python -c "import os; print(os.getcwd())"', cwd=tmp_path)
         assert result.startswith("shell://")
 
     def test_empty_command_raises(self):
@@ -283,12 +283,11 @@ class TestRunShell:
         assert exc_info.value.returncode == 42
 
 
-# Тесты для create_test() 
+# Тесты для create_test()
 
 
 class TestCreateTest:
-    """Тесты функции create_test.
-    """
+    """Тесты функции create_test."""
 
     def test_create_with_pytest_template(self, tmp_path: Path):
         """Создание файла с шаблоном pytest."""
@@ -355,7 +354,7 @@ class TestCreateTest:
         assert file.read_text() == ""
 
 
-# Расширенные тесты execute_ritual() 
+# Расширенные тесты execute_ritual()
 
 
 class TestExecuteRitualExtended:
