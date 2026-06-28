@@ -115,7 +115,7 @@ class TestRuleTemplate:
     def test_to_ritual(self):
         """Конвертация шаблона в Ritual."""
         from breaker.core.schema import Ritual, ActionType
-        
+
         template = RuleTemplate(
             id="test_template",
             name="Test",
@@ -124,9 +124,9 @@ class TestRuleTemplate:
             target="example.py",
             action_type="open_file",
         )
-        
+
         ritual = template.to_ritual()
-        
+
         assert isinstance(ritual, Ritual)
         assert ritual.signal == "файл пуст"
         assert ritual.action == "открыть файл"
@@ -143,16 +143,16 @@ class TestRuleTemplate:
             target="target",
             action_type="invalid_type",  # ← невалидный тип
         )
-        
+
         with pytest.raises(ValueError) as exc_info:
             template.to_ritual()
-        
+
         assert "Invalid action_type" in str(exc_info.value)
 
     def test_full_integration_template_to_executor(self, tmp_path: Path):
         """Полная интеграция: шаблон → Ritual → executor."""
         from breaker.engine.executor import execute_ritual
-        
+
         # Создаём шаблон
         template = RuleTemplate(
             id="create_test_template",
@@ -162,17 +162,18 @@ class TestRuleTemplate:
             target=str(tmp_path / "test_new.py"),
             action_type="create_test",
         )
-        
+
         # Конвертируем в Ritual
         ritual = template.to_ritual()
-        
+
         # Выполняем через executor
         result = execute_ritual(ritual)
-        
+
         # Проверяем результат
         assert result.success is True
         assert result.evidence_link.startswith("file://")
         assert (tmp_path / "test_new.py").exists()
+
 
 # Тесты для TemplateStorage
 

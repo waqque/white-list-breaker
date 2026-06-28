@@ -93,8 +93,9 @@ def _play_sound() -> None:
                 # Используем PowerShell с SoundPlayer (надёжнее для WAV)
                 subprocess.run(
                     [
-                        "powershell", "-c",
-                        f'(New-Object Media.SoundPlayer "{sound_path}").PlaySync()'
+                        "powershell",
+                        "-c",
+                        f'(New-Object Media.SoundPlayer "{sound_path}").PlaySync()',
                     ],
                     capture_output=True,
                     timeout=10,
@@ -131,8 +132,9 @@ def _play_sound_wsl(sound_path: Path) -> None:
             # Вызываем powershell.exe (он доступен из WSL!)
             subprocess.run(
                 [
-                    "powershell.exe", "-c",
-                    f'(New-Object Media.SoundPlayer "{windows_path_escaped}").PlaySync()'
+                    "powershell.exe",
+                    "-c",
+                    f'(New-Object Media.SoundPlayer "{windows_path_escaped}").PlaySync()',
                 ],
                 capture_output=True,
                 timeout=10,
@@ -157,6 +159,7 @@ def _play_system_sound() -> None:
             )
         elif sys.platform == "win32":
             import winsound
+
             winsound.Beep(1000, 500)
         else:
             print("\a", end="", flush=True)
@@ -253,25 +256,29 @@ def pomodoro_timer(minutes: int = 5) -> bool:
 
     _play_sound()
 
-    console.print(Panel(
-        "[bold green]ВРЕМЯ ВЫШЛО![/bold green]\n\n"
-        "[dim]Микро-шаг выполнен. Отдохни 5 минут.[/dim]",
-        border_style="green",
-        title="Pomodoro"
-    ))
+    console.print(
+        Panel(
+            "[bold green]ВРЕМЯ ВЫШЛО![/bold green]\n\n"
+            "[dim]Микро-шаг выполнен. Отдохни 5 минут.[/dim]",
+            border_style="green",
+            title="Pomodoro",
+        )
+    )
 
     return True
 
 
 def run_timer_with_prompt() -> bool:
     # Полный цикл: спросить минуты -> запустить таймер
-    console.print(Panel(
-        "[bold cyan]Помодоро-таймер[/bold cyan]\n\n"
-        "Выбери, сколько минут хочешь работать без отвлечений.",
-        title="Настройка таймера",
-        border_style="cyan",
-        padding=(1, 2)
-    ))
+    console.print(
+        Panel(
+            "[bold cyan]Помодоро-таймер[/bold cyan]\n\n"
+            "Выбери, сколько минут хочешь работать без отвлечений.",
+            title="Настройка таймера",
+            border_style="cyan",
+            padding=(1, 2),
+        )
+    )
 
     minutes = ask_duration()
     console.print(f"\n[green]Запускаем таймер на {minutes} мин[/green]")
