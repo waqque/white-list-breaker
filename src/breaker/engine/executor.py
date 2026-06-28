@@ -74,6 +74,9 @@ def open_file(
 ) -> str:
     """
     Кроссплатформенно открывает существующий файл в редакторе или системном приложении.
+    
+    Если указанный редактор не найден в PATH — автоматически использует
+    системное приложение по умолчанию (fallback).
     """
     # Проверка на пустой путь
     if not path or str(path).strip() == "":
@@ -90,18 +93,26 @@ def open_file(
 
     # Если файл — директория, тоже ошибка
     if path.is_dir():
-        raise BreakerFileNotFoundError(f"Указан путь к директории, а не к файлу: {path}")
-
-    # Если указан конкретный редактор — запускаем его
+        raise BreakerFileNotFoundError(
+            f"Указан путь к директории, а не к файлу: {path}"
+        )
+    
+    # Если указан конкретный редактор — пробуем его
     if editor:
-        return _open_in_editor(path, editor, timeout)
-
+        try:
+            return _open_in_editor(path, editor, timeout)
+        except CommandNotFoundError:
+            # Fallback: если редактор не найден, используем системное приложение
+            print(f"  Редактор '{editor}' не найден в PATH. "
+                  f"Открываю системным приложением по умолчанию...")
+            return _open_system_default(path)
+    
     # Иначе — открываем системным приложением по умолчанию
     return _open_system_default(path)
 
 
 def _open_in_editor(path: Path, editor: str, timeout: int) -> str:
-    """Открывает файл в указанном редакторе (code, vim, nano и т.д.)."""
+    """Открывает файл в редакторе"""
     try:
         cmd = [editor, str(path)]
         subprocess.run(
@@ -115,7 +126,6 @@ def _open_in_editor(path: Path, editor: str, timeout: int) -> str:
         raise CommandNotFoundError(f"Editor '{editor}' not found. Install it or check PATH.")
     except subprocess.TimeoutExpired:
         raise CommandTimeoutError(f"Editor '{editor}' did not start within {timeout} seconds.")
-
 
 def _open_system_default(path: Path) -> str:
     """Открывает файл системным приложением по умолчанию."""
