@@ -1,4 +1,5 @@
 """Тесты для core/schema.py."""
+
 import json
 import pytest
 from breaker.core.schema import (
@@ -19,7 +20,7 @@ class TestActionType:
         assert ActionType.OPEN_FILE.value == "open_file"
         assert ActionType.RUN_SHELL.value == "run_shell"
         assert ActionType.CREATE_TEST.value == "create_test"
-    
+
     def test_enum_from_string(self):
         assert ActionType("open_file") == ActionType.OPEN_FILE
 
@@ -38,7 +39,7 @@ class TestRitual:
         assert ritual.action_type == ActionType.OPEN_FILE
         assert ritual.task_id is None
         assert ritual.created_at
-    
+
     def test_create_ritual_with_task_id(self):
         ritual = Ritual(
             signal="открываю проект",
@@ -48,7 +49,7 @@ class TestRitual:
             task_id="task_123",
         )
         assert ritual.task_id == "task_123"
-    
+
     def test_format_rule(self):
         ritual = Ritual(
             signal="файл пуст",
@@ -57,7 +58,7 @@ class TestRitual:
             action_type=ActionType.OPEN_FILE,
         )
         assert ritual.format_rule() == "ЕСЛИ файл пуст → ТО написать функцию"
-    
+
     def test_to_dict(self):
         ritual = Ritual(
             signal="сигнал",
@@ -71,7 +72,7 @@ class TestRitual:
         assert data["action_type"] == "create_test"
         assert data["task_id"] == "task_456"
         assert "created_at" in data
-    
+
     def test_to_json(self):
         ritual = Ritual(
             signal="сигнал",
@@ -82,7 +83,7 @@ class TestRitual:
         json_str = ritual.to_json()
         assert "сигнал" in json_str
         assert "open_file" in json_str
-    
+
     def test_from_dict(self):
         data = {
             "signal": "файл пуст",
@@ -96,7 +97,7 @@ class TestRitual:
         assert ritual.signal == "файл пуст"
         assert ritual.action_type == ActionType.OPEN_FILE
         assert ritual.task_id == "task_789"
-    
+
     def test_from_json(self):
         json_str = """
         {
@@ -111,7 +112,7 @@ class TestRitual:
         ritual = Ritual.from_json(json_str)
         assert ritual.signal == "тест"
         assert ritual.action_type == ActionType.RUN_SHELL
-    
+
     def test_roundtrip_json(self):
         original = Ritual(
             signal="сигнал",
@@ -125,7 +126,7 @@ class TestRitual:
         assert restored.signal == original.signal
         assert restored.action_type == original.action_type
         assert restored.task_id == original.task_id
-    
+
     def test_validate_empty_signal(self):
         ritual = Ritual(
             signal="",
@@ -136,7 +137,7 @@ class TestRitual:
         errors = ritual.validate()
         assert len(errors) > 0
         assert any("Сигнал" in e for e in errors)
-    
+
     def test_validate_empty_action(self):
         ritual = Ritual(
             signal="сигнал",
@@ -146,7 +147,7 @@ class TestRitual:
         )
         errors = ritual.validate()
         assert any("Действие" in e for e in errors)
-    
+
     def test_validate_empty_target(self):
         ritual = Ritual(
             signal="сигнал",
@@ -156,7 +157,7 @@ class TestRitual:
         )
         errors = ritual.validate()
         assert any("Цель" in e for e in errors)
-    
+
     def test_validate_ok(self):
         ritual = Ritual(
             signal="сигнал",
@@ -166,7 +167,7 @@ class TestRitual:
         )
         assert ritual.validate() == []
         assert ritual.is_valid() is True
-    
+
     def test_invalid_action_type(self):
         ritual = Ritual(
             signal="сигнал",
@@ -195,7 +196,7 @@ class TestRitualResult:
         assert result.evidence_link == "file:///path/to/main.py"
         assert result.error_message is None
         assert result.started_at
-    
+
     def test_error_result(self):
         ritual = Ritual(
             signal="команда не работает",
@@ -210,7 +211,7 @@ class TestRitualResult:
         )
         assert result.success is False
         assert result.error_message == "Command not found"
-    
+
     def test_to_dict(self):
         ritual = Ritual(
             signal="сигнал",
@@ -223,7 +224,7 @@ class TestRitualResult:
         assert data["success"] is True
         assert "ritual" in data
         assert data["ritual"]["signal"] == "сигнал"
-    
+
     def test_to_json(self):
         ritual = Ritual(
             signal="сигнал",
@@ -235,7 +236,7 @@ class TestRitualResult:
         json_str = result.to_json()
         parsed = json.loads(json_str)
         assert parsed["success"] is True
-    
+
     def test_mark_finished(self):
         ritual = Ritual(
             signal="сигнал",
@@ -263,7 +264,7 @@ class TestXapiVerb:
         data = verb.to_dict()
         assert data["id"] == "http://adlnet.gov/expapi/verbs/launched"
         assert "ru-RU" in data["display"]
-    
+
     def test_verb_planned(self):
         verb = XapiVerb.planned()
         data = verb.to_dict()
@@ -284,13 +285,13 @@ class TestXapiContext:
         data = ctx.to_dict()
         assert "contextActivities" in data
         assert data["contextActivities"]["parent"][0]["id"] == "course:CS101"
-    
+
     def test_context_with_skill(self):
         ctx = XapiContext(skill_id="SKILL_001")
         data = ctx.to_dict()
         assert "extensions" in data
         assert data["extensions"]["skill:id"] == "SKILL_001"
-    
+
     def test_empty_context(self):
         ctx = XapiContext()
         data = ctx.to_dict()
@@ -311,20 +312,20 @@ class TestXapiStatement:
             success=True,
             evidence_link="file:///path/to/example.py",
         )
-    
+
     def test_statement_from_ritual_result(self):
         result = self._make_ritual_result()
         actor = XapiActor(mbox="mailto:student@example.com", name="Student")
-        
+
         statement = XapiStatement.from_ritual_result(
             result=result,
             actor=actor,
             course_id="CS101",
             event_type=EventType.TASK_STARTED,
         )
-        
+
         data = statement.to_dict()
-        
+
         assert data["actor"]["mbox"] == "mailto:student@example.com"
         assert data["verb"]["id"] == "http://adlnet.gov/expapi/verbs/launched"
         assert data["object"]["id"] == "task:123"
@@ -334,32 +335,32 @@ class TestXapiStatement:
         assert "ifThenRule" in data["result"]["extensions"]
         assert data["context"]["contextActivities"]["parent"][0]["id"] == "course:CS101"
         assert "timestamp" in data
-    
+
     def test_statement_without_context(self):
         result = self._make_ritual_result()
         actor = XapiActor(mbox="mailto:student@example.com", name="Student")
-        
+
         statement = XapiStatement.from_ritual_result(
             result=result,
             actor=actor,
         )
-        
+
         data = statement.to_dict()
         assert "context" not in data
-    
+
     def test_statement_planned_event(self):
         result = self._make_ritual_result()
         actor = XapiActor(mbox="mailto:student@example.com", name="Student")
-        
+
         statement = XapiStatement.from_ritual_result(
             result=result,
             actor=actor,
             event_type=EventType.PLAN_CREATED,
         )
-        
+
         data = statement.to_dict()
         assert data["verb"]["id"] == "http://adlnet.gov/expapi/verbs/planned"
-    
+
     def test_statement_with_error(self):
         ritual = Ritual(
             signal="команда не работает",
@@ -374,31 +375,31 @@ class TestXapiStatement:
             error_message="Command not found",
         )
         actor = XapiActor(mbox="mailto:student@example.com", name="Student")
-        
+
         statement = XapiStatement.from_ritual_result(
             result=result,
             actor=actor,
         )
-        
+
         data = statement.to_dict()
         assert data["result"]["success"] is False
         assert data["result"]["extensions"]["errorMessage"] == "Command not found"
-    
+
     def test_statement_to_json(self):
         result = self._make_ritual_result()
         actor = XapiActor(mbox="mailto:student@example.com", name="Student")
-        
+
         statement = XapiStatement.from_ritual_result(
             result=result,
             actor=actor,
             course_id="CS101",
         )
-        
+
         json_str = statement.to_json()
         parsed = json.loads(json_str)
         assert parsed["actor"]["name"] == "Student"
         assert parsed["object"]["id"] == "task:123"
-    
+
     def test_statement_unknown_task_id(self):
         ritual = Ritual(
             signal="сигнал",
@@ -408,11 +409,11 @@ class TestXapiStatement:
         )
         result = RitualResult(ritual=ritual, success=True)
         actor = XapiActor(mbox="mailto:student@example.com", name="Student")
-        
+
         statement = XapiStatement.from_ritual_result(
             result=result,
             actor=actor,
         )
-        
+
         data = statement.to_dict()
         assert data["object"]["id"] == "task:unknown"

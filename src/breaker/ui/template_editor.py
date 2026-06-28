@@ -34,10 +34,7 @@ def _action_type_from_str(choice: str) -> str:
 
 def list_templates_ui() -> None:
     # Показать список всех шаблонов в виде таблицы.
-    console.print(Panel(
-        "[bold]Список сохранённых шаблонов[/bold]",
-        border_style="cyan"
-    ))
+    console.print(Panel("[bold]Список сохранённых шаблонов[/bold]", border_style="cyan"))
 
     templates = storage.list_templates()
 
@@ -76,10 +73,7 @@ def list_templates_ui() -> None:
 
 def create_template_ui() -> None:
     # Создать новый шаблон.
-    console.print(Panel(
-        "[bold]Создание нового шаблона[/bold]",
-        border_style="green"
-    ))
+    console.print(Panel("[bold]Создание нового шаблона[/bold]", border_style="green"))
 
     name = Prompt.ask("Название шаблона")
     signal = Prompt.ask("Сигнал (если...)")
@@ -119,10 +113,7 @@ def create_template_ui() -> None:
 
 def delete_template_ui() -> None:
     # Удалить пользовательский шаблон по ID.
-    console.print(Panel(
-        "[bold]Удаление шаблона[/bold]",
-        border_style="red"
-    ))
+    console.print(Panel("[bold]Удаление шаблона[/bold]", border_style="red"))
 
     list_templates_ui()
     template_id = Prompt.ask("\nВведите ID шаблона для удаления")
@@ -134,9 +125,7 @@ def delete_template_ui() -> None:
         return
 
     if template.is_system:
-        console.print(
-            f"[red]Системный шаблон {template_id} нельзя удалить.[/red]"
-        )
+        console.print(f"[red]Системный шаблон {template_id} нельзя удалить.[/red]")
         return
 
     if Confirm.ask(f"Удалить шаблон [cyan]{template_id}[/cyan] ({template.name})?"):
@@ -149,10 +138,7 @@ def delete_template_ui() -> None:
 
 def search_templates_ui() -> None:
     # Поиск шаблонов по названию/сигналу/описанию.
-    console.print(Panel(
-        "[bold]Поиск шаблонов[/bold]",
-        border_style="yellow"
-    ))
+    console.print(Panel("[bold]Поиск шаблонов[/bold]", border_style="yellow"))
 
     query = Prompt.ask("Введите запрос для поиска")
     results = storage.search_templates(query)
@@ -181,15 +167,17 @@ def search_templates_ui() -> None:
 def main_menu() -> None:
     # Главное меню редактора.
     while True:
-        console.print(Panel(
-            "[1] Показать все шаблоны\n"
-            "[2] Создать шаблон\n"
-            "[3] Удалить шаблон\n"
-            "[4] Найти шаблон\n"
-            "[0] Выход",
-            title="Редактор шаблонов",
-            border_style="magenta"
-        ))
+        console.print(
+            Panel(
+                "[1] Показать все шаблоны\n"
+                "[2] Создать шаблон\n"
+                "[3] Удалить шаблон\n"
+                "[4] Найти шаблон\n"
+                "[0] Выход",
+                title="Редактор шаблонов",
+                border_style="magenta",
+            )
+        )
 
         choice = IntPrompt.ask("Выберите пункт", default=0)
 

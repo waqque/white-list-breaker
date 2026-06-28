@@ -114,7 +114,11 @@ docker-up: ## Поднять контейнер/сервис
 
 docker-down: ## Остановить контейнер
 	docker-compose down
+ lint: ## Проверить код через flake8
+	$(PYTHON) -m flake8 src/ tests/ --max-line-length=100
 
+format: ## Отформатировать код через black
+	$(PYTHON) -m black src/ tests/ --line-length=100
 
 clean: ## Очистить артефакты: __pycache__, .pytest_cache, htmlcov
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

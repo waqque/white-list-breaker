@@ -81,16 +81,16 @@ def open_file(
     # Проверка на пустой путь
     if not path or str(path).strip() == "":
         raise ValueError("Path cannot be empty")
-    
+
     path = Path(path).resolve()
-  
+
     if not path.exists():
         raise BreakerFileNotFoundError(
             f"Файл не найден: {path}\n"
             f"Модуль открывает только существующие файлы. "
             f"Создайте файл вручную или используйте create_test()."
         )
-    
+
     # Если файл — директория, тоже ошибка
     if path.is_dir():
         raise BreakerFileNotFoundError(
@@ -123,13 +123,9 @@ def _open_in_editor(path: Path, editor: str, timeout: int) -> str:
         )
         return f"file://{path}"
     except FileNotFoundError:
-        raise CommandNotFoundError(
-            f"Editor '{editor}' not found. Install it or check PATH."
-        )
+        raise CommandNotFoundError(f"Editor '{editor}' not found. Install it or check PATH.")
     except subprocess.TimeoutExpired:
-        raise CommandTimeoutError(
-            f"Editor '{editor}' did not start within {timeout} seconds."
-        )
+        raise CommandTimeoutError(f"Editor '{editor}' did not start within {timeout} seconds.")
 
 def _open_system_default(path: Path) -> str:
     """Открывает файл системным приложением по умолчанию."""
@@ -146,9 +142,7 @@ def _open_system_default(path: Path) -> str:
             subprocess.run(["xdg-open", str(path)], check=True, timeout=10)
             return f"file://{path}"
         else:
-            raise CommandNotFoundError(
-                f"Unsupported OS: {system}. Cannot open file automatically."
-            )
+            raise CommandNotFoundError(f"Unsupported OS: {system}. Cannot open file automatically.")
     except FileNotFoundError:
         raise CommandNotFoundError(
             f"System opener not found on {system}. "
@@ -173,12 +167,12 @@ def run_shell(
     # Проверка на пустую команду
     if not command or str(command).strip() == "":
         raise ValueError("Command cannot be empty")
-    
-    # Проверка на опасные команды 
+
+    # Проверка на опасные команды
     dangerous_commands = ["rm -rf /", "format c:", "del /f /s /q"]
     if any(dangerous in command.lower() for dangerous in dangerous_commands):
         raise ValueError(f"Dangerous command detected: {command}")
-    
+
     print(f"   Выполняю команду: {command}")
 
     try:
@@ -201,9 +195,7 @@ def run_shell(
     except FileNotFoundError:
         raise CommandNotFoundError(f"Shell or command not found: {command}")
     except subprocess.TimeoutExpired:
-        raise CommandTimeoutError(
-            f"Command '{command}' timed out after {timeout} seconds."
-        )
+        raise CommandTimeoutError(f"Command '{command}' timed out after {timeout} seconds.")
 
 
 def create_test(
@@ -261,8 +253,6 @@ if __name__ == "__main__":
     }
 
     if template not in templates:
-        raise ValueError(
-            f"Unknown template: {template}. Available: {list(templates.keys())}"
-        )
+        raise ValueError(f"Unknown template: {template}. Available: {list(templates.keys())}")
 
     return templates[template]
