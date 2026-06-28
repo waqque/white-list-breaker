@@ -70,15 +70,51 @@ class TestOpenFile:
             args, kwargs = mock_run.call_args
             assert args[0] == ["code", str(file.resolve())]
 
-    def test_editor_not_found_raises(self, tmp_path: Path):
-        """Если редактор не установлен — CommandNotFoundError."""
+    def test_editor_not_found_fallback_to_system(self, tmp_path: Path):
+        """Если редактор не установлен — fallback на системное приложение."""
         file = tmp_path / "test.py"
         file.write_text("print('hi')")
 
-        with patch("breaker.engine.executor.subprocess.run") as mock_run:
-            mock_run.side_effect = FileNotFoundError("No such file")
+        with patch("breaker.engine.executor._open_in_editor") as mock_editor:
+            mock_editor.side_effect = CommandNotFoundError("Editor not found")
+            
+            with patch("breaker.engine.executor._open_system_default") as mock_system:
+                mock_system.return_value = f"file://{file.resolve()}"
+                
+                result = open_file(file, editor="nonexistent-editor")
+                
+                # Проверяем, что вызвался fallback
+                mock_system.assert_called_once()
+                assert result == f"file://{file.resolve()}"
+
+    def test_explicit_editor_not_found_raises(self, tmp_path: Path):
+        """Если явно указан editor=None и системное приложение не найдено — ошибка."""
+        file = tmp_path / "test.py"
+        file.write_text("print('hi')")
+
+        with patch("breaker.engine.executor._open_system_default") as mock_system:
+            mock_system.side_effect = CommandNotFoundError("System opener not found")
+            
             with pytest.raises(CommandNotFoundError):
-                open_file(file, editor="nonexistent-editor")
+                open_file(file, editor=None)
+
+    def test_fallback_when_editor_not_in_path(self, tmp_path: Path):
+        """Проверяем, что модуль работает даже если 'code' не в PATH."""
+        file = tmp_path / "test.py"
+        file.write_text("print('hi')")
+
+        with patch("breaker.engine.executor._open_in_editor") as mock_editor:
+            mock_editor.side_effect = CommandNotFoundError("Editor 'code' not found")
+            
+            with patch("breaker.engine.executor._open_system_default") as mock_system:
+                mock_system.return_value = f"file://{file.resolve()}"
+                
+                result = open_file(file)  
+                
+                # Проверяем, что вызвался fallback
+                mock_editor.assert_called_once()
+                mock_system.assert_called_once()
+                assert result == f"file://{file.resolve()}"  
 
     def test_editor_timeout_raises(self, tmp_path: Path):
         """Если редактор завис — CommandTimeoutError."""
