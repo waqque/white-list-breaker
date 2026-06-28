@@ -272,7 +272,7 @@ class TestRunShell:
 
     def test_command_timeout_raises(self):
         """Команда, которая спит дольше таймаута — CommandTimeoutError."""
-        cmd = "sleep 10" if platform.system() != "Windows" else "timeout 10"
+        cmd = 'python -c "import time; time.sleep(10)"'
         with pytest.raises(CommandTimeoutError):
             run_shell(cmd, timeout=1)
 
