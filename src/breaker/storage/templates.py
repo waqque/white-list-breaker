@@ -56,9 +56,9 @@ class RuleTemplate:
 
     def to_ritual(self):
         """Конвертировать шаблон в объект Ritual для executor.py."""
-        
+
         from breaker.core.schema import Ritual, ActionType
-        
+
         try:
             action_type = ActionType(self.action_type)
         except ValueError as e:
@@ -66,14 +66,15 @@ class RuleTemplate:
                 f"Invalid action_type in template '{self.id}': {self.action_type}. "
                 f"Valid types: {[t.value for t in ActionType]}"
             ) from e
-        
+
         return Ritual(
             signal=self.signal,
             action=self.action,
             target=self.target,
             action_type=action_type,
         )
-        
+
+
 class TemplateStorage:
     """Хранилище шаблонов правил."""
 

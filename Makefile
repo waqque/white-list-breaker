@@ -74,6 +74,7 @@ init-files: ## Создать файлы-заглушки
 install: ## Установить зависимости (pip install -r requirements.txt)
 	@test -f requirements.txt || (echo "Файл requirements.txt не найден. Создайте его или запустите 'make init'." && exit 1)
 	pip install -r requirements.txt
+	pip install -e .
 
 install-dev: ## Установить зависимости + инструменты разработки (pytest, flake8, black)
 	@test -f requirements.txt || (echo "Файл requirements.txt не найден." && exit 1)
