@@ -96,3 +96,11 @@ def test_search_templates_ui_no_results(mock_input, isolated_storage, capsys):
     search_templates_ui()
     captured = capsys.readouterr()
     assert "ничего не найдено" in captured.out.lower()
+
+# Тест для main_menu редактора с выходом
+@patch("rich.prompt.IntPrompt.ask", return_value=0)
+def test_template_editor_main_menu_exit(mock_input, capsys):
+    from breaker.ui.template_editor import main_menu
+    main_menu()
+    captured = capsys.readouterr()
+    assert "свидания" in captured.out.lower()
