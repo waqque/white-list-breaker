@@ -47,27 +47,40 @@ def _is_wsl() -> bool:
 
 
 def _linux_path_to_windows(linux_path: Path) -> str:
-    # Конвертировать Linux-путь в Windows-путь через wslpath.
+    """Конвертировать Linux-путь (/mnt/c/...) в Windows-путь (C:\\...).
+
+    Использует wslpath если доступен, иначе ручная конвертация.
+    Использует PurePosixPath для корректной работы на Windows.
+    """
+    from pathlib import PurePosixPath
+
+    # Пробуем wslpath
     try:
         result = subprocess.run(
             ["wslpath", "-w", str(linux_path)],
             capture_output=True,
             text=True,
+            check=True,
             timeout=5,
         )
-        if result.returncode == 0:
-            return result.stdout.strip()
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return result.stdout.strip()
+    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
         pass
 
-    # Fallback: ручная конвертация /mnt/c/... → C:\...
-    path_str = str(linux_path)
+    # Fallback: ручная конвертация
+    # Используем PurePosixPath чтобы на Windows '/' не превращался в '\'
+    posix_path = PurePosixPath(linux_path)
+    path_str = str(posix_path)
+
     if path_str.startswith("/mnt/"):
         # /mnt/c/Users/... → C:\Users\...
-        drive = path_str[5].upper()
-        rest = path_str[7:].replace("/", "\\")
-        return f"{drive}:\\{rest}"
+        drive_letter = path_str[5].upper()  # 'c' → 'C'
+        rest = path_str[7:]  # 'Users/test/file.wav'
+        # Заменяем '/' на '\\' для Windows
+        windows_path = f"{drive_letter}:\\{rest.replace('/', chr(92))}"
+        return windows_path
 
+    # Не /mnt/ — возвращаем как есть (но с '/' для совместимости)
     return path_str
 
 
