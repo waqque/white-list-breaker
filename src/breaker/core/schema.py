@@ -13,7 +13,7 @@ class ActionType(Enum):
     """Типы действий модуля."""
 
     OPEN_FILE = "open_file"
-    RUN_SHELL = "run_shell"
+
     CREATE_TEST = "create_test"
 
 
