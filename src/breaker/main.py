@@ -11,9 +11,13 @@ import argparse
 import sys
 from pathlib import Path
 
+import threading
+import time
+from rich.prompt import Confirm
+
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import IntPrompt, Prompt
+from rich.prompt import IntPrompt, Prompt, Confirm
 from rich.table import Table
 
 # Импорт модулей Участника В (UI)
@@ -22,7 +26,7 @@ from breaker.ui.timer import run_timer_with_prompt
 from breaker.ui.template_editor import main_menu as editor_menu
 
 # Импорт модулей Участника Б (Engine + Storage)
-from breaker.engine.executor import execute_ritual
+from breaker.engine.executor import execute_ritual, open_file, run_shell, create_test
 from breaker.storage.templates import TemplateStorage
 
 # Импорт модулей Участника А (Core)
@@ -78,7 +82,117 @@ def show_main_menu():
 
 
 # ============================================================================
-# Полный цикл: правило → выполнение → таймер → лог → xAPI
+# Меню действий после ритуала
+# ============================================================================
+
+def monitor_activity(ritual: Ritual, timeout_minutes: int = 5):
+    """Отслеживать активность пользователя.
+    
+    Если пользователь бездействует timeout_minutes минут,
+    модуль сам предлагает действия.
+    """
+    console.print()
+    console.print("[dim]🧠 Я буду следить за твоей активностью...[/dim]")
+    console.print(f"[dim]Если ты застрянешь — я помогу через {timeout_minutes} минут.[/dim]")
+    
+    def check():
+        minutes = 0
+        console.print(f"[dim]⏳ Бездействие: 0 мин[/dim]")
+        
+        while minutes < timeout_minutes:
+            time.sleep(60)
+            minutes += 1
+            console.print(f"[dim]⏳ Бездействие: {minutes} мин[/dim]")
+        
+        # Время вышло — пользователь бездействовал
+        console.print()
+        console.print("[yellow]⚠️ Похоже, ты застрял![/yellow]")
+        console.print("[cyan]Давай сформулируем новое правило или выполним действие.[/cyan]")
+        
+        if Confirm.ask("Хочешь продолжить работу с модулем?", default=True):
+            console.print()
+            console.print("[bold cyan]📋 Что делаем дальше?[/bold cyan]")
+            show_actions_menu()  # ← твоя функция с меню действий
+        else:
+            console.print("[dim]Хорошо. Завершаю работу...[/dim]")
+    
+    # Запускаем в фоновом потоке
+    thread = threading.Thread(target=check, daemon=True)
+    thread.start()
+    return thread
+
+def show_actions_menu():
+    """Показать меню действий и выполнить выбор пользователя."""
+    while True:
+        console.print()
+        console.print(
+            Panel(
+                "[bold white][1][/bold white] 📂 Открыть файл\n"
+                "[bold white][2][/bold white] 🧪 Создать тест\n"
+                "[bold white][3][/bold white] 🖥️ Выполнить команду\n"
+                "[bold white][4][/bold white] ✅ Закончить работу",
+                title="[bold cyan]Что делаем дальше?[/bold cyan]",
+                border_style="cyan",
+                padding=(1, 2),
+            )
+        )
+
+        try:
+            choice = IntPrompt.ask("Выберите пункт", default=4)
+        except (KeyboardInterrupt, EOFError):
+            console.print("\n[dim]Выход...[/dim]")
+            return
+
+        if choice == 1:
+            file_path = Prompt.ask("📂 Путь к файлу")
+            if not file_path.strip():
+                console.print("[red]❌ Путь не может быть пустым.[/red]")
+                continue
+            try:
+                evidence = open_file(file_path)
+                console.print(f"[green]✅ Файл открыт: {evidence}[/green]")
+            except Exception as e:
+                console.print(f"[red]❌ Ошибка: {e}[/red]")
+
+        elif choice == 2:
+            file_path = Prompt.ask("🧪 Имя файла для теста", default="test_new.py")
+            try:
+                evidence = create_test(file_path)
+                console.print(f"[green]✅ Тест создан: {evidence}[/green]")
+                # Показываем созданный файл
+                test_file = Path(file_path)
+                if test_file.exists():
+                    console.print(
+                        Panel(
+                            f"[dim]{test_file.read_text(encoding='utf-8')}[/dim]",
+                            title=f"Содержимое {file_path}",
+                            border_style="green",
+                        )
+                    )
+            except Exception as e:
+                console.print(f"[red]❌ Ошибка: {e}[/red]")
+
+        elif choice == 3:
+            command = Prompt.ask("🖥️ Команда для выполнения")
+            if not command.strip():
+                console.print("[red]❌ Команда не может быть пустой.[/red]")
+                continue
+            try:
+                evidence = run_shell(command)
+                console.print(f"[green]✅ Команда выполнена: {evidence}[/green]")
+            except Exception as e:
+                console.print(f"[red]❌ Ошибка: {e}[/red]")
+
+        elif choice == 4:
+            console.print("[green]✅ Работа завершена. Удачи![/green]")
+            break
+
+        else:
+            console.print("[red]❌ Неизвестный пункт. Выберите 1-4.[/red]")
+
+
+# ============================================================================
+# Полный цикл: правило → выполнение → выбор таймера → действия → лог → xAPI
 # ============================================================================
 def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
     """Выполнить полный цикл работы модуля.
@@ -112,11 +226,22 @@ def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
     else:
         console.print(f"[red]❌ Ошибка: {result.error_message}[/red]")
 
-    # Шаг 3: Pomodoro-таймер (Участник В) — только если действие успешно
-    if result.success and not skip_timer:
-        console.print()
-        console.print("[bold cyan]Шаг 3/4: Pomodoro-таймер[/bold cyan]")
-        console.print("[dim]Теперь сосредоточься на задаче![/dim]")
+    # Шаг 3: Pomodoro-таймер — всегда спрашиваем пользователя
+    console.print()
+    console.print("[bold cyan]Шаг 3/4: Pomodoro-таймер[/bold cyan]")
+
+    # Если skip_timer передан через флаг --no-timer — пропускаем
+    if skip_timer:
+        console.print("[dim]⏭️ Таймер пропущен (флаг --no-timer).[/dim]")
+        run_timer = False
+    else:
+        # Спрашиваем пользователя
+        run_timer = Confirm.ask(
+            "[yellow]Запустить Pomodoro-таймер?[/yellow]",
+            default=True
+        )
+
+    if run_timer:
         try:
             timer_completed = run_timer_with_prompt()
             if timer_completed:
@@ -125,10 +250,17 @@ def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
                 console.print("[yellow]⏸️ Pomodoro прерван.[/yellow]")
         except Exception as e:
             console.print(f"[yellow]⚠️ Ошибка таймера: {e}[/yellow]")
+    else:
+        console.print("[dim]⏭️ Таймер пропущен.[/dim]")
 
-    # Шаг 4: Логирование + xAPI (Участник А)
+    # Шаг 4: Меню действий — ВСЕГДА показываем
     console.print()
-    console.print("[bold cyan]Шаг 4/4: Фиксирую результат...[/bold cyan]")
+    console.print("[bold cyan]Шаг 4/4: Что делаем дальше?[/bold cyan]")
+    show_actions_menu()
+
+    # Логирование + xAPI (Участник А) — после завершения работы
+    console.print()
+    console.print("[bold cyan]📝 Фиксирую результат...[/bold cyan]")
 
     # Логируем в NDJSON
     log_file = log_ritual_result(result)
@@ -161,8 +293,16 @@ def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
                 border_style="yellow",
             )
         )
-
+    if result.success:
+        # ... твой код с таймером и меню действий ...
+        
+        # 🔥 НОВОЕ: запускаем мониторинг активности
+        console.print()
+        console.print("[bold cyan]🧠 Отслеживание активности[/bold cyan]")
+        monitor_activity(ritual, timeout_minutes=5)
+    
     return result
+
 
 
 # ============================================================================
