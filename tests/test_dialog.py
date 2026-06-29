@@ -1,9 +1,9 @@
-# 24 passed
 from unittest.mock import patch
 from breaker.core.schema import Ritual, ActionType
 from breaker.ui.dialog import (
     ask_signal,
     ask_action,
+    ask_file_mode,
     ask_target,
     detect_action_type,
     ask_ritual,
@@ -24,57 +24,74 @@ def test_ask_action(mock_input):
     result = ask_action()
     assert result == "напишу функцию"
 
+@patch("rich.prompt.Prompt.ask", return_value="1")
+def test_ask_file_mode_create(mock_input):
+    # Проверяем, что ask_file_mode возвращает "create" при выборе 1.
+    result = ask_file_mode()
+    assert result == "create"
+
+
+@patch("rich.prompt.Prompt.ask", return_value="2")
+def test_ask_file_mode_open(mock_input):
+    # Проверяем, что ask_file_mode возвращает "open" при выборе 2.
+    result = ask_file_mode()
+    assert result == "open"
+
 
 @patch("rich.prompt.Prompt.ask", return_value="main.py")
-def test_ask_target(mock_input):
+@patch("pathlib.Path.exists", return_value=False)
+def test_ask_target(mock_exists, mock_input):
     # Проверяем, что ask_target возвращает введённую строку.
-    result = ask_target()
+    result = ask_target("create")
     assert result == "main.py"
 
 
 def test_detect_action_type_open_file():
-    # Тест определения типа действия: открытие файла.
-    assert detect_action_type("main.py") == ActionType.OPEN_FILE
-    assert detect_action_type("src/app.js") == ActionType.OPEN_FILE
-    assert detect_action_type("example.py") == ActionType.OPEN_FILE
-
-
-def test_detect_action_type_run_shell():
-    # Тест определения типа действия: запуск команды.
-    assert detect_action_type("npm start") == ActionType.RUN_SHELL
-    assert detect_action_type("python main.py") == ActionType.RUN_SHELL
-    assert detect_action_type("git status") == ActionType.RUN_SHELL
-    assert detect_action_type("make lint") == ActionType.RUN_SHELL
+    # Тест определения типа действия: открытие файла (режим "open").
+    assert detect_action_type("main.py", "open") == ActionType.OPEN_FILE
+    assert detect_action_type("src/app.js", "open") == ActionType.OPEN_FILE
+    assert detect_action_type("example.py", "open") == ActionType.OPEN_FILE
 
 
 def test_detect_action_type_create_test():
-    # Тест определения типа действия: создание теста.
-    assert detect_action_type("tests/test_main.py") == ActionType.CREATE_TEST
-    assert detect_action_type("test_app.js") == ActionType.CREATE_TEST
-    assert detect_action_type("my_test.py") == ActionType.CREATE_TEST
+    # Тест определения типа действия: создание файла (режим "create").
+    assert detect_action_type("main.py", "create") == ActionType.CREATE_TEST
+    assert detect_action_type("classes.py", "create") == ActionType.CREATE_TEST
+    assert detect_action_type("README.md", "create") == ActionType.CREATE_TEST
 
 
-@patch("rich.prompt.Prompt.ask", side_effect=["файл пуст", "напишу функцию", "main.py"])
-def test_ask_ritual(mock_input):
-    # Проверяем, что ask_ritual возвращает объект Ritual.
+
+def test_detect_action_type_test_file_in_open_mode():
+    # Тест определения типа действия: тестовый файл в режиме "open".
+    assert detect_action_type("tests/test_main.py", "open") == ActionType.CREATE_TEST
+    assert detect_action_type("test_app.js", "open") == ActionType.CREATE_TEST
+    assert detect_action_type("my_test.py", "open") == ActionType.CREATE_TEST
+
+
+@patch("rich.prompt.Prompt.ask", side_effect=["файл пуст", "напишу функцию", "1", "main.py"])
+@patch("pathlib.Path.exists", return_value=False)
+def test_ask_ritual(mock_exists, mock_input):
+    # Проверяем, что ask_ritual возвращает объект Ritual (4 вопроса).
     ritual = ask_ritual(task_id="test-task")
     assert isinstance(ritual, Ritual)
     assert ritual.signal == "файл пуст"
     assert ritual.action == "напишу функцию"
     assert ritual.target == "main.py"
-    assert ritual.action_type == ActionType.OPEN_FILE
+    assert ritual.action_type == ActionType.CREATE_TEST  # режим "create"
     assert ritual.task_id == "test-task"
 
 
-@patch("rich.prompt.Prompt.ask", side_effect=["консоль не запущена", "запущу npm", "npm start"])
-def test_ask_ritual_shell_command(mock_input):
-    # Проверяем, что ask_ritual определяет shell-команду.
+@patch("rich.prompt.Prompt.ask", side_effect=["консоль не запущена", "запущу npm", "2", "main.py"])
+@patch("pathlib.Path.exists", return_value=True)
+def test_ask_ritual_open_mode(mock_exists, mock_input):
+    # Проверяем, что ask_ritual в режиме "open" использует OPEN_FILE.
     ritual = ask_ritual()
-    assert ritual.action_type == ActionType.RUN_SHELL
+    assert ritual.action_type == ActionType.OPEN_FILE
 
 
-@patch("rich.prompt.Prompt.ask", side_effect=["нужен тест", "создам тест", "tests/test_main.py"])
-def test_ask_ritual_create_test(mock_input):
+@patch("rich.prompt.Prompt.ask", side_effect=["нужен тест", "создам тест", "1", "tests/test_main.py"])
+@patch("pathlib.Path.exists", return_value=False)
+def test_ask_ritual_create_test(mock_exists, mock_input):
     # Проверяем, что ask_ritual определяет создание теста.
     ritual = ask_ritual()
     assert ritual.action_type == ActionType.CREATE_TEST
@@ -183,7 +200,8 @@ def test_ask_target_empty_then_valid():
     """ask_target() - пустой ответ, потом валидный."""
     from breaker.ui.dialog import ask_target
     with patch("rich.prompt.Prompt.ask", side_effect=["", "main.py"]):
-        result = ask_target()
+        with patch("pathlib.Path.exists", return_value=False):
+            result = ask_target("create")
     assert result == "main.py"
 
 
