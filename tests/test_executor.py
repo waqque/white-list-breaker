@@ -287,56 +287,150 @@ class TestRunShell:
 
 
 class TestCreateTest:
-    """Тесты функции create_test."""
+    """Тесты функции create_test.
+
+    Все тесты используют tmp_path, поэтому созданные файлы
+    НЕ попадают в репозиторий и автоматически удаляются pytest.
+    
+    ВАЖНО: все тесты мокают open_file(), чтобы не запускать
+    реальный редактор во время тестов.
+    """
 
     def test_create_with_pytest_template(self, tmp_path: Path):
         """Создание файла с шаблоном pytest."""
         file = tmp_path / "test_example.py"
-        result = create_test(file, template="pytest")
+        
+        with patch("breaker.engine.executor.open_file") as mock_open:
+            mock_open.return_value = f"file://{file.resolve()}"
+            result = create_test(file, template="pytest")
 
-        assert result == f"file://{file.resolve()}"
-        assert file.exists()
-        content = file.read_text()
-        assert "def test_placeholder" in content
-        assert "assert True" in content
+            assert result == f"file://{file.resolve()}"
+            assert file.exists()
+            content = file.read_text()
+            assert "def test_placeholder" in content
+            assert "assert True" in content
+            mock_open.assert_called_once()
 
     def test_create_with_unittest_template(self, tmp_path: Path):
         """Создание файла с шаблоном unittest."""
         file = tmp_path / "test_example.py"
-        result = create_test(file, template="unittest")
+        
+        with patch("breaker.engine.executor.open_file") as mock_open:
+            mock_open.return_value = f"file://{file.resolve()}"
+            result = create_test(file, template="unittest")
 
-        assert result == f"file://{file.resolve()}"
-        assert file.exists()
-        content = file.read_text()
-        assert "import unittest" in content
-        assert "class Test" in content
+            assert result == f"file://{file.resolve()}"
+            assert file.exists()
+            content = file.read_text()
+            assert "import unittest" in content
+            assert "class Test" in content
 
     def test_create_with_custom_content(self, tmp_path: Path):
         """Создание файла с кастомным содержимым."""
         file = tmp_path / "custom.txt"
         content = "Hello, World!"
-        result = create_test(file, content=content)
+        
+        with patch("breaker.engine.executor.open_file") as mock_open:
+            mock_open.return_value = f"file://{file.resolve()}"
+            result = create_test(file, content=content)
 
-        assert result == f"file://{file.resolve()}"
-        assert file.exists()
-        assert file.read_text() == content
+            assert result == f"file://{file.resolve()}"
+            assert file.exists()
+            assert file.read_text() == content
 
     def test_create_creates_parent_dirs(self, tmp_path: Path):
         """Создание файла в несуществующей директории."""
         file = tmp_path / "deep" / "nested" / "dir" / "test.py"
-        result = create_test(file)
+        
+        with patch("breaker.engine.executor.open_file") as mock_open:
+            mock_open.return_value = f"file://{file.resolve()}"
+            result = create_test(file)
 
-        assert result == f"file://{file.resolve()}"
-        assert file.exists()
-        assert file.parent.exists()
+            assert result == f"file://{file.resolve()}"
+            assert file.exists()
+            assert file.parent.exists()
 
-    def test_create_refuses_to_overwrite(self, tmp_path: Path):
-        """Если файл уже существует — FileExistsError."""
+    def test_create_opens_existing_file(self, tmp_path: Path):
+        """Если файл уже существует — открывается без ошибки."""
+        file = tmp_path / "existing.py"
+        file.write_text("# existing content")
+
+        with patch("breaker.engine.executor.open_file") as mock_open:
+            mock_open.return_value = f"file://{file.resolve()}"
+            result = create_test(file)
+
+            # Файл открыт, а не перезаписан
+            assert result == f"file://{file.resolve()}"
+            assert file.read_text() == "# existing content"
+            mock_open.assert_called_once()
+
+    def test_create_refuses_to_overwrite_when_no_open(self, tmp_path: Path):
+        """Если open_after_create=False и файл существует — падает с FileExistsError."""
         file = tmp_path / "existing.py"
         file.write_text("original")
 
         with pytest.raises(FileExistsError):
-            create_test(file)
+            create_test(file, open_after_create=False)
+
+    def test_create_without_opening(self, tmp_path: Path):
+        """Создание файла без автоматического открытия."""
+        file = tmp_path / "no_open.py"
+        
+        result = create_test(file, open_after_create=False)
+
+        assert result == f"file://{file.resolve()}"
+        assert file.exists()
+
+    def test_create_with_any_name(self, tmp_path: Path):
+        """Создание файла с любым именем (не только test_...)."""
+        # Имена, которые не начинаются с test_
+        for filename in ["main.py", "utils.py", "README.md", "notes.txt"]:
+            file = tmp_path / filename
+            
+            with patch("breaker.engine.executor.open_file") as mock_open:
+                mock_open.return_value = f"file://{file.resolve()}"
+                result = create_test(file)
+
+                assert file.exists()
+                assert result == f"file://{file.resolve()}"
+
+    def test_create_with_python_template(self, tmp_path: Path):
+        """Создание Python-файла с шаблоном 'python'."""
+        file = tmp_path / "main.py"
+        
+        with patch("breaker.engine.executor.open_file") as mock_open:
+            mock_open.return_value = f"file://{file.resolve()}"
+            result = create_test(file, template="python")
+
+            assert file.exists()
+            content = file.read_text()
+            assert "def main():" in content
+            assert 'if __name__ == "__main__"' in content
+
+    def test_create_with_markdown_template(self, tmp_path: Path):
+        """Создание Markdown-файла с шаблоном 'markdown'."""
+        file = tmp_path / "README.md"
+        
+        with patch("breaker.engine.executor.open_file") as mock_open:
+            mock_open.return_value = f"file://{file.resolve()}"
+            result = create_test(file, template="markdown")
+
+            assert file.exists()
+            content = file.read_text()
+            assert "# Readme" in content
+            assert "## Описание" in content
+
+    def test_create_with_text_template(self, tmp_path: Path):
+        """Создание текстового файла с шаблоном 'text'."""
+        file = tmp_path / "notes.txt"
+        
+        with patch("breaker.engine.executor.open_file") as mock_open:
+            mock_open.return_value = f"file://{file.resolve()}"
+            result = create_test(file, template="text")
+
+            assert file.exists()
+            content = file.read_text()
+            assert "Notes" in content
 
     def test_unknown_template_raises(self, tmp_path: Path):
         """Неизвестный шаблон — ValueError."""
@@ -347,11 +441,14 @@ class TestCreateTest:
     def test_empty_template(self, tmp_path: Path):
         """Шаблон 'empty' создаёт пустой файл."""
         file = tmp_path / "empty.txt"
-        result = create_test(file, template="empty")
+        
+        with patch("breaker.engine.executor.open_file") as mock_open:
+            mock_open.return_value = f"file://{file.resolve()}"
+            result = create_test(file, template="empty")
 
-        assert result == f"file://{file.resolve()}"
-        assert file.exists()
-        assert file.read_text() == ""
+            assert result == f"file://{file.resolve()}"
+            assert file.exists()
+            assert file.read_text() == ""
 
 
 # Расширенные тесты execute_ritual()
@@ -414,8 +511,8 @@ class TestExecuteRitualExtended:
         assert "def test_placeholder" in test_file.read_text()
         assert result.finished_at is not None
 
-    def test_execute_create_test_error(self, tmp_path: Path):
-        """execute_ritual() с CREATE_TEST и существующим файлом — ошибка."""
+    def test_execute_create_test_opens_existing(self, tmp_path: Path):
+        """execute_ritual() с CREATE_TEST и существующим файлом — открывает его."""
         test_file = tmp_path / "existing.py"
         test_file.write_text("# existing")
 
@@ -426,9 +523,15 @@ class TestExecuteRitualExtended:
             action_type=ActionType.CREATE_TEST,
         )
 
-        result = execute_ritual(ritual)
+        # Мокаем open_file, чтобы не запускать реальный редактор
+        with patch("breaker.engine.executor.open_file") as mock_open:
+            mock_open.return_value = f"file://{test_file.resolve()}"
+            result = execute_ritual(ritual)
 
-        assert isinstance(result, RitualResult)
-        assert result.success is False
-        assert "already exists" in result.error_message
-        assert result.finished_at is not None
+            assert isinstance(result, RitualResult)
+            assert result.success is True  # ← Теперь успех!
+            assert result.evidence_link == f"file://{test_file.resolve()}"
+            # Файл не перезаписан
+            assert test_file.read_text() == "# existing"
+            # open_file был вызван
+            mock_open.assert_called_once()
