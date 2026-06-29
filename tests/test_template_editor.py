@@ -71,7 +71,7 @@ def test_delete_template_ui_user_template(mock_confirm, mock_input, isolated_sto
     assert "удалён" in captured.out
 
 
-@patch("rich.prompt.Prompt.ask", return_value="run_linter")
+@patch("rich.prompt.Prompt.ask", return_value="open_readme")
 def test_delete_template_ui_system_template(mock_input, isolated_storage, capsys):
     from breaker.ui.template_editor import delete_template_ui
 

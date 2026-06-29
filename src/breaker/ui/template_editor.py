@@ -23,11 +23,10 @@ storage = TemplateStorage()
 
 def _action_type_from_str(choice: str) -> str:
     # Преобразовать выбор пользователя в строку action_type.
-    # RuleTemplate хранит action_type как str
+    # RUN_SHELL удалён — модуль работает только с файлами.
     action_type_map = {
         "1": ActionType.OPEN_FILE.value,
-        "2": ActionType.RUN_SHELL.value,
-        "3": ActionType.CREATE_TEST.value,
+        "2": ActionType.CREATE_TEST.value,
     }
     return action_type_map[choice]
 
@@ -82,10 +81,9 @@ def create_template_ui() -> None:
     description = Prompt.ask("Описание (необязательно)", default="")
 
     console.print("\n[bold]Тип действия:[/bold]")
-    console.print("  1. [green]open_file[/green]   — открыть файл")
-    console.print("  2. [green]run_shell[/green]   — выполнить команду")
-    console.print("  3. [green]create_test[/green] — создать тест")
-    choice = Prompt.ask("Номер", choices=["1", "2", "3"], default="1")
+    console.print("  1. [green]open_file[/green]   — открыть/создать файл")
+    console.print("  2. [green]create_test[/green] — создать тест")
+    choice = Prompt.ask("Номер", choices=["1", "2"], default="1")
 
     # Генерируем уникальный ID для пользовательского шаблона
     user_templates = [t for t in storage.list_templates() if not t.is_system]

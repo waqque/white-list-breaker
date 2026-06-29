@@ -1,9 +1,10 @@
-# Диалог с пользователем: 3 вопроса + подтверждение правила
+# Диалог с пользователем: 3 вопроса + выбор режима + подтверждение правила
 # Использует rich для красивого цветного вывода в терминале
 # Импортирует Ritual и ActionType из core.schema (от Участника А)
 # Интегрирован с TemplateStorage (от Участника Б) для работы с шаблонами
 
 
+from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm, IntPrompt
@@ -26,7 +27,7 @@ def ask_signal() -> str:
 
     console.print("\n[bold cyan]Вопрос 1 из 3[/bold cyan]")
     console.print(
-        "[dim]Примеры: 'файл пуст', 'не знаю, с чего начать', " "'консоль не запущена'[/dim]"
+        "[dim]Примеры: 'файл пуст'[/dim]"
     )
 
     signal = Prompt.ask("[yellow]Какая ситуация блокирует вас?[/yellow]")
@@ -54,54 +55,109 @@ def ask_action() -> str:
     return action.strip()
 
 
-def ask_target() -> str:
-    # Вопрос 3: Какой ресурс открыть/запустить?
-    # Returns: str: Непустая строка с путём к файлу или командой
+def ask_file_mode() -> str:
+    # Вопрос 3: Создать новый файл и открыть его или открыть уже существующий файл?
+    # Returns: str: "create" или "open"
 
     console.print("\n[bold cyan]Вопрос 3 из 3[/bold cyan]")
-    console.print("[dim]Примеры: 'main.py', 'tests/test_main.py'[/dim]")
+    console.print(
+        "  • [green][1] Создать файл[/green] — создать новый пустой файл и открыть его\n"
+        "  • [green][2] Открыть файл[/green] — открыть уже существующий файл"
+    )
 
-    target = Prompt.ask("[yellow]Какой ресурс нужно открыть или команду запустить?[/yellow]")
+    while True:
+        choice = Prompt.ask(
+            "\n[yellow]Ваш выбор (1 или 2)[/yellow]",
+            choices=["1", "2"],
+            default="1",
+        )
+        if choice == "1":
+            return "create"
+        elif choice == "2":
+            return "open"
 
-    while not target.strip():
-        console.print("[red]Цель не может быть пустым.[/red]")
-        target = Prompt.ask("[yellow]Какой ресурс?[/yellow]")
 
-    return target.strip()
+def ask_target(file_mode: str) -> str:
+    # Вопрос 4: Какой файл создать или открыть?
+    # Returns: str: Непустая строка с путём к файлу
+
+    if file_mode == "create":
+        console.print("[dim]Примеры: 'main.py', 'README.md'[/dim]")
+
+        while True:
+            target = Prompt.ask("[yellow]Как назвать новый файл?[/yellow]")
+
+            if not target.strip():
+                console.print("[red]Имя файла не может быть пустым.[/red]")
+                continue
+
+            target = target.strip()
+            target_path = Path(target)
+
+            if target_path.exists():
+                console.print(
+                    f"[red]Файл '{target}' уже существует.[/red]\n"
+                    "[dim]Выберите другое имя или используйте режим 'Открыть файл'.[/dim]"
+                )
+                continue
+
+            return target
+
+    else:  # file_mode == "open"
+        console.print("[dim]Примеры: 'main.py', 'README.md'[/dim]")
+
+        while True:
+            target = Prompt.ask("[yellow]Какой файл открыть?[/yellow]")
+
+            if not target.strip():
+                console.print("[red]Путь к файлу не может быть пустым.[/red]")
+                continue
+
+            target = target.strip()
+            target_path = Path(target)
+
+            if not target_path.exists():
+                console.print(
+                    f"[red]Файл '{target}' не найден.[/red]\n"
+                    "[dim]Проверьте путь или используйте режим 'Создать файл'.[/dim]"
+                )
+                continue
+
+            return target
 
 
-def detect_action_type(target: str) -> ActionType:
-    # Автоматически определить тип действия по цели.
+def detect_action_type(target: str, file_mode: str) -> ActionType:
+    """Автоматически определить тип действия.
 
-    """
     Логика:
-    - Если target содержит 'test' → CREATE_TEST
-    - Если target содержит пробел или команды (npm, python и т.д.) → RUN_SHELL
+    - Если режим "create" → CREATE_TEST (используем для создания любых файлов)
+    - Если режим "open" и target содержит 'test' → CREATE_TEST
     - Иначе → OPEN_FILE
 
     Args:
-        target: Путь к файлу или команда
+        target: Путь к файлу
+        file_mode: "create" или "open"
 
     Returns:
-        ActionType: Определённый тип действия
+        ActionType: OPEN_FILE или CREATE_TEST
     """
     target_lower = target.lower()
 
-    # Создание теста
+    # Если пользователь выбрал "Создать файл" — используем CREATE_TEST
+    # (create_test() в executor.py умеет создавать любые файлы)
+    if file_mode == "create":
+        return ActionType.CREATE_TEST
+
+    # Если режим "Открыть файл" — проверяем, это тест?
     if target_lower.startswith(("tests/", "test_")) or "test" in target_lower:
         return ActionType.CREATE_TEST
 
-    # Shell-команда
-    shell_keywords = ["npm", "python", "make", "git", "node", "cargo"]
-    if " " in target or any(cmd in target_lower for cmd in shell_keywords):
-        return ActionType.RUN_SHELL
-
-    # По умолчанию — открытие файла
+    # По умолчанию — открытие существующего файла
     return ActionType.OPEN_FILE
 
 
 def ask_ritual(task_id: str = "demo-task") -> Ritual:
-    # Задать 3 вопроса и вернуть объект Ritual.
+    # Задать вопросы и вернуть объект Ritual.
 
     """
     Args:
@@ -124,8 +180,9 @@ def ask_ritual(task_id: str = "demo-task") -> Ritual:
 
     signal = ask_signal()
     action = ask_action()
-    target = ask_target()
-    action_type = detect_action_type(target)
+    file_mode = ask_file_mode()
+    target = ask_target(file_mode)
+    action_type = detect_action_type(target, file_mode)
 
     ritual = Ritual(
         signal=signal,
@@ -274,7 +331,7 @@ def _create_from_template() -> "Ritual | None":
     signal = Prompt.ask("[yellow]Сигнал (если...)[/yellow]", default=template.signal)
     action = Prompt.ask("[yellow]Действие (то...)[/yellow]", default=template.action)
     target = Prompt.ask("[yellow]Цель (ресурс)[/yellow]", default=template.target)
-    action_type = detect_action_type(target)
+    action_type = detect_action_type(target, "create")
 
     ritual = Ritual(
         signal=signal,
@@ -293,8 +350,6 @@ def _create_from_template() -> "Ritual | None":
 
 
 def main_menu() -> None:
-    # Главное меню UI-модуля White-sheet-breaker.
-
     """
     Позволяет пользователю:
     - Создать правило с нуля
