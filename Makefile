@@ -95,7 +95,8 @@ test-engine: ## Запустить тесты движка (executor, templates)
 
 test-ui: ## Запустить тесты UI (dialog, timer)
 	$(PYTHON) -m pytest $(TESTS_DIR)/test_dialog.py \
-	                   $(TESTS_DIR)/test_timer.py -v
+	                   $(TESTS_DIR)/test_timer.py \
+	                   $(TESTS_DIR)/test_template_editor.py -v
 
 demo: ## Демонстрация работы модуля (пример задачи + правило + шаг)
 	LRS_MODE=mock $(PYTHON) -m $(MODULE) --demo
@@ -103,11 +104,8 @@ demo: ## Демонстрация работы модуля (пример зад
 run-cli: ## Запустить CLI-интерфейс модуля
 	LRS_MODE=$(LRS_MODE) $(PYTHON) -m $(MODULE)
 
-run-api: ## REST API сервер (не в MVP)
-	@echo " REST API не реализован в MVP. Используйте 'make run-cli'."
-	@exit 1
 
-docker-build: ## Собрать Docker-контейнер
+docker-build: ## Собрать Docker-контейнер (с заглушками)
 	docker build -t white-sheet-breaker:latest .
 
 docker-up: ## Поднять контейнер/сервис

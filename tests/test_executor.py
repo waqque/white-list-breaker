@@ -77,12 +77,12 @@ class TestOpenFile:
 
         with patch("breaker.engine.executor._open_in_editor") as mock_editor:
             mock_editor.side_effect = CommandNotFoundError("Editor not found")
-            
+
             with patch("breaker.engine.executor._open_system_default") as mock_system:
                 mock_system.return_value = f"file://{file.resolve()}"
-                
+
                 result = open_file(file, editor="nonexistent-editor")
-                
+
                 # Проверяем, что вызвался fallback
                 mock_system.assert_called_once()
                 assert result == f"file://{file.resolve()}"
@@ -94,7 +94,7 @@ class TestOpenFile:
 
         with patch("breaker.engine.executor._open_system_default") as mock_system:
             mock_system.side_effect = CommandNotFoundError("System opener not found")
-            
+
             with pytest.raises(CommandNotFoundError):
                 open_file(file, editor=None)
 
@@ -105,16 +105,16 @@ class TestOpenFile:
 
         with patch("breaker.engine.executor._open_in_editor") as mock_editor:
             mock_editor.side_effect = CommandNotFoundError("Editor 'code' not found")
-            
+
             with patch("breaker.engine.executor._open_system_default") as mock_system:
                 mock_system.return_value = f"file://{file.resolve()}"
-                
-                result = open_file(file)  
-                
+
+                result = open_file(file)
+
                 # Проверяем, что вызвался fallback
                 mock_editor.assert_called_once()
                 mock_system.assert_called_once()
-                assert result == f"file://{file.resolve()}"  
+                assert result == f"file://{file.resolve()}"
 
     def test_editor_timeout_raises(self, tmp_path: Path):
         """Если редактор завис — CommandTimeoutError."""

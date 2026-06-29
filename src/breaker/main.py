@@ -13,7 +13,7 @@ from pathlib import Path
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import IntPrompt, Prompt
+from rich.prompt import IntPrompt, Prompt, Confirm
 from rich.table import Table
 
 # Импорт модулей Участника В (UI)
@@ -116,15 +116,25 @@ def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
     if result.success and not skip_timer:
         console.print()
         console.print("[bold cyan]Шаг 3/4: Pomodoro-таймер[/bold cyan]")
-        console.print("[dim]Теперь сосредоточься на задаче![/dim]")
-        try:
-            timer_completed = run_timer_with_prompt()
-            if timer_completed:
-                console.print("[green]🎉 Pomodoro завершён![/green]")
-            else:
-                console.print("[yellow]⏸️ Pomodoro прерван.[/yellow]")
-        except Exception as e:
-            console.print(f"[yellow]⚠️ Ошибка таймера: {e}[/yellow]")
+        
+        # Спрашиваем пользователя, хочет ли он запустить таймер
+        run_timer = Confirm.ask(
+            "[yellow]Запустить Pomodoro-таймер для фокусировки?[/yellow]",
+            default=True
+        )
+        
+        if run_timer:
+            console.print("[dim]Теперь сосредоточься на задаче![/dim]")
+            try:
+                timer_completed = run_timer_with_prompt()
+                if timer_completed:
+                    console.print("[green]🎉 Pomodoro завершён![/green]")
+                else:
+                    console.print("[yellow]⏸️ Pomodoro прерван.[/yellow]")
+            except Exception as e:
+                console.print(f"[yellow]⚠️ Ошибка таймера: {e}[/yellow]")
+        else:
+            console.print("[dim]⏭️ Пропускаем Pomodoro-таймер.[/dim]")
 
     # Шаг 4: Логирование + xAPI (Участник А)
     console.print()
