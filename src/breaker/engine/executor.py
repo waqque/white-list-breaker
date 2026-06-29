@@ -5,7 +5,6 @@
 
 Поддерживает три типа действий:
 - OPEN_FILE: открыть файл в редакторе (кроссплатформенно)
-- RUN_SHELL: выполнить команду в shell
 - CREATE_TEST: создать файл-шаблон теста
 """
 
@@ -37,8 +36,6 @@ def execute_ritual(ritual: Ritual) -> RitualResult:
         # Выбираем стратегию выполнения на основе action_type
         if ritual.action_type == ActionType.OPEN_FILE:
             evidence = open_file(ritual.target)
-        elif ritual.action_type == ActionType.RUN_SHELL:
-            evidence = run_shell(ritual.target)
         elif ritual.action_type == ActionType.CREATE_TEST:
             evidence = create_test(ritual.target)
         else:
@@ -153,51 +150,6 @@ def _open_system_default(path: Path) -> str:
         raise CommandTimeoutError("System opener timed out.")
     except subprocess.CalledProcessError as e:
         raise CommandFailedError(e.returncode, str(e.stderr))
-
-
-def run_shell(
-    command: str,
-    cwd: Optional[str | Path] = None,
-    timeout: int = 30,
-    capture_output: bool = True,
-) -> str:
-    """
-    Запускает shell-команду с обработкой ошибок и таймаутом.
-
-    """
-    # Проверка на пустую команду
-    if not command or str(command).strip() == "":
-        raise ValueError("Command cannot be empty")
-
-    # Проверка на опасные команды
-    dangerous_commands = ["rm -rf /", "format c:", "del /f /s /q"]
-    if any(dangerous in command.lower() for dangerous in dangerous_commands):
-        raise ValueError(f"Dangerous command detected: {command}")
-
-    print(f"   Выполняю команду: {command}")
-
-    try:
-        result = subprocess.run(
-            command,
-            shell=True,
-            cwd=cwd,
-            timeout=timeout,
-            capture_output=capture_output,
-            text=True,
-        )
-
-        # Если команда вернула ненулевой код — считаем это ошибкой
-        if result.returncode != 0:
-            raise CommandFailedError(result.returncode, result.stderr or "")
-
-        print(f"   Команда выполнена успешно (код: {result.returncode})")
-        return f"shell://{command}"
-
-    except FileNotFoundError:
-        raise CommandNotFoundError(f"Shell or command not found: {command}")
-    except subprocess.TimeoutExpired:
-        raise CommandTimeoutError(f"Command '{command}' timed out after {timeout} seconds.")
-
 
 def create_test(
     path: str | Path,
