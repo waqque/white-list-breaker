@@ -47,9 +47,10 @@ def _is_wsl() -> bool:
 
 
 def _linux_path_to_windows(linux_path: Path) -> str:
-    """Конвертировать Linux-путь (/mnt/c/...) в Windows-путь (C:\\...)."""
-    from pathlib import PurePosixPath
+    """Конвертировать Linux-путь (/mnt/c/...) в Windows-путь (C:\\...).
 
+    Использует wslpath если доступен, иначе ручная конвертация.
+    """
     # Пробуем wslpath
     try:
         result = subprocess.run(
@@ -64,18 +65,28 @@ def _linux_path_to_windows(linux_path: Path) -> str:
         pass
 
     # Fallback: ручная конвертация
-    # Используем PurePosixPath для парсинга, но as_posix() для строки
-    posix_path = PurePosixPath(linux_path)
-    path_str = posix_path.as_posix()  # ← ИСПРАВЛЕНО: используем as_posix()
-
+    # На Windows Path("/mnt/c/...") становится WindowsPath с путём \mnt\c\...
+    # Нужно нормализовать путь к POSIX-формату
+    path_str = str(linux_path)
+    
+    # Если путь начинается с \ (Windows), заменяем на /
+    if path_str.startswith("\\"):
+        path_str = "/" + path_str[1:]
+    
+    # Заменяем все \ на /
+    path_str = path_str.replace("\\", "/")
+    
+    # Теперь path_str в POSIX-формате: /mnt/c/Users/test/file.wav
+    
     if path_str.startswith("/mnt/"):
-        drive_letter = path_str[5].upper()
-        rest = path_str[7:]
+        drive_letter = path_str[5].upper()  # 'c' → 'C'
+        rest = path_str[7:]  # 'Users/test/file.wav'
+        # Заменяем '/' на '\\' для Windows
         windows_path = f"{drive_letter}:\\{rest.replace('/', chr(92))}"
         return windows_path
 
+    # Не /mnt/ — возвращаем как есть
     return path_str
-
 
 def _play_sound() -> None:
     """Воспроизвести звуковой сигнал (кроссплатформенно, включая WSL)."""
