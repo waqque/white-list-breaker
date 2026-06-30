@@ -10,6 +10,8 @@
 import argparse
 import sys
 from pathlib import Path
+import threading
+import signal
 
 from rich.console import Console
 from rich.panel import Panel
@@ -38,6 +40,37 @@ from breaker.core.tracker import log_ritual_result
 from breaker.core.xapi_client import send_statement, LrsConfig
 
 console = Console()
+
+# Глобальные переменные для управления прогрессом и мониторингом
+_progress_paused = False
+_current_monitor = None
+_monitor_thread = None
+
+
+def set_progress_paused(paused: bool):
+    """Приостановить/возобновить обновление прогресса."""
+    global _progress_paused
+    _progress_paused = paused
+
+
+def signal_handler(signum, frame):
+    """Обработчик сигнала Ctrl+C."""
+    global _current_monitor, _monitor_thread
+    
+    console.print("\n[yellow]⏸️ Получен сигнал прерывания...[/yellow]")
+    
+    # Если есть активный монитор - останавливаем его
+    if _current_monitor:
+        _current_monitor.set_interrupted()
+    
+    # Если есть поток мониторинга - ждём его завершения
+    if _monitor_thread and _monitor_thread.is_alive():
+        console.print("[dim]Ожидаем завершения мониторинга...[/dim]")
+        _monitor_thread.join(timeout=2)
+    
+    # Выходим из программы
+    console.print("\n[dim]👋 До свидания! Удачи в работе![/dim]\n")
+    sys.exit(0)
 
 
 # ============================================================================
@@ -85,18 +118,71 @@ def show_main_menu():
 
 
 # ============================================================================
+# Фоновое наблюдение с помощью ActivityMonitor
+# ============================================================================
+def run_with_monitoring(ritual: Ritual, blocking: bool = False) -> threading.Thread | None:
+    """Запустить фоновое наблюдение за активностью пользователя."""
+    global _current_monitor, _monitor_thread
+    
+    # Определяем файлы для наблюдения
+    watched_files = []
+    if ritual.action_type in [ActionType.OPEN_FILE, ActionType.CREATE_TEST]:
+        watched_files.append(Path(ritual.target))
+
+    if not watched_files:
+        console.print("[yellow]⚠️ Нет файлов для наблюдения[/yellow]")
+        return None
+
+    # Создаём монитор
+    monitor = ActivityMonitor(
+        watched_files=watched_files,
+        idle_threshold_level1=30,   # 30 секунд
+        idle_threshold_level2=60,   # 1 минута
+        idle_threshold_timeout=90,  # 1.5 минуты
+        activity_threshold=50,
+        check_interval=5,
+        help_level1_callback=lambda: show_help_level1(watched_files[0]),
+        help_level2_callback=lambda: show_help_level2(watched_files[0]),
+        apply_choice_callback=lambda choice, level: apply_help_choice(choice, watched_files[0], level),
+        success_callback=lambda info: show_success_message(watched_files[0], info),
+        progress_refresh_callback=set_progress_paused,
+    )
+    
+    _current_monitor = monitor
+
+    def _run_monitor():
+        try:
+            result = monitor.start_monitoring()
+            if result == "success":
+                console.print("[green]🎉 Отлично! Вы начали работу.[/green]")
+            elif result == "timeout":
+                console.print("[yellow]⏰ Сессия завершена из-за неактивности.[/yellow]")
+            elif result == "interrupted":
+                console.print("[yellow]⏸️ Мониторинг прерван пользователем.[/yellow]")
+            else:
+                console.print("[dim]👋 Мониторинг завершён.[/dim]")
+        except Exception as e:
+            console.print(f"[red]❌ Ошибка мониторинга: {e}[/red]")
+        finally:
+            _current_monitor = None
+
+    if blocking:
+        _run_monitor()
+        return None
+    else:
+        thread = threading.Thread(target=_run_monitor, daemon=True)
+        thread.start()
+        _monitor_thread = thread
+        return thread
+
+
+# ============================================================================
 # Полный цикл: правило → выполнение → (опционально таймер) → наблюдение → лог → xAPI
 # ============================================================================
 def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
-    """Выполнить полный цикл работы модуля.
-
-    Args:
-        ritual: Правило "если-то" для выполнения.
-        skip_timer: Если True — не спрашивать про Pomodoro-таймер.
-
-    Returns:
-        RitualResult с результатом выполнения.
-    """
+    """Выполнить полный цикл работы модуля."""
+    global _monitor_thread
+    
     console.print()
     console.print(
         Panel(
@@ -120,11 +206,14 @@ def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
         console.print(f"[red]❌ Ошибка: {result.error_message}[/red]")
 
     # Шаг 3: Опциональный Pomodoro-таймер + фоновое наблюдение
+    monitor_thread = None
+    monitor_started = False
+
     if result.success and not skip_timer:
         console.print()
         console.print("[bold cyan]Шаг 3/4: Что дальше?[/bold cyan]")
 
-        # Спрашиваем только про таймер
+        # Спрашиваем про таймер
         try:
             start_timer = Confirm.ask(
                 "\n[cyan]Запустить Pomodoro-таймер для концентрации?[/cyan]",
@@ -133,6 +222,15 @@ def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
         except (KeyboardInterrupt, EOFError):
             start_timer = False
 
+        # Запускаем фоновое наблюдение (если это файл)
+        if ritual.action_type in [ActionType.OPEN_FILE, ActionType.CREATE_TEST]:
+            console.print()
+            console.print("[bold cyan]👀 Запускаю фоновое наблюдение...[/bold cyan]")
+            console.print("[dim]Модуль поможет, если вы зависнете.[/dim]")
+            monitor_thread = run_with_monitoring(ritual, blocking=False)
+            monitor_started = True
+
+        # Запускаем таймер (параллельно с наблюдением)
         if start_timer:
             console.print()
             console.print("[dim]Сосредоточься на задаче![/dim]")
@@ -142,14 +240,29 @@ def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
                     console.print("[green]🎉 Pomodoro завершён![/green]")
                 else:
                     console.print("[yellow]⏸️ Pomodoro прерван.[/yellow]")
+            except KeyboardInterrupt:
+                console.print("\n[yellow]⏸️ Таймер прерван пользователем.[/yellow]")
             except Exception as e:
                 console.print(f"[yellow]⚠️ Ошибка таймера: {e}[/yellow]")
 
-        # ВСЕГДА запускаем фоновое наблюдение (если это файл)
-        if ritual.action_type in [ActionType.OPEN_FILE, ActionType.CREATE_TEST]:
+        # Если мониторинг запущен, ждём его завершения
+        if monitor_started and monitor_thread:
             console.print()
-            console.print("[dim]Модуль поможет, если вы зависнете.[/dim]")
-            run_with_monitoring(ritual)
+            console.print("[dim]⏳ Ожидаем вашу активность в файле...[/dim]")
+            console.print("[dim](Начните редактировать файл, чтобы завершить наблюдение)[/dim]")
+            console.print("[dim](Нажмите Ctrl+C для прерывания)[/dim]")
+            
+            try:
+                monitor_thread.join()
+            except KeyboardInterrupt:
+                console.print("\n[yellow]⏸️ Ожидание прервано пользователем.[/yellow]")
+
+            if monitor_thread.is_alive():
+                console.print("[yellow]⚠️ Мониторинг всё ещё работает, но мы продолжаем...[/yellow]")
+            else:
+                console.print("[dim]✅ Наблюдение завершено[/dim]")
+            
+            _monitor_thread = None
 
     # Шаг 4: Логирование + xAPI (Участник А)
     console.print()
@@ -188,54 +301,6 @@ def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
         )
 
     return result
-
-
-# ============================================================================
-# Фоновое наблюдение с помощью ActivityMonitor
-# ============================================================================
-def run_with_monitoring(ritual: Ritual):
-    """Запустить фоновое наблюдение за активностью пользователя.
-
-    Args:
-        ritual: Правило, которое было выполнено.
-    """
-    # Определяем файлы для наблюдения
-    watched_files = []
-    if ritual.action_type in [ActionType.OPEN_FILE, ActionType.CREATE_TEST]:
-        watched_files.append(Path(ritual.target))
-
-    if not watched_files:
-        console.print("[yellow]⚠️ Нет файлов для наблюдения[/yellow]")
-        return
-
-    # Создаём и запускаем монитор
-    monitor = ActivityMonitor(
-        watched_files=watched_files,
-        idle_threshold_level1=60,   # 1 минута
-        idle_threshold_level2=180,  # 3 минуты
-        idle_threshold_timeout=300, # 5 минут
-        activity_threshold=100,     # 100 символов
-        check_interval=10,
-        help_level1_callback=lambda: show_help_level1(watched_files[0]),
-        help_level2_callback=lambda: show_help_level2(watched_files[0]),
-        apply_choice_callback=lambda choice, level: apply_help_choice(choice, watched_files[0], level),
-        success_callback=lambda info: show_success_message(watched_files[0], info),
-    )
-
-    try:
-        result = monitor.start_monitoring()
-
-        if result == "success":
-            console.print("[green]🎉 Отлично! Вы начали работу.[/green]")
-        elif result == "timeout":
-            console.print("[yellow]⏰ Сессия завершена из-за неактивности.[/yellow]")
-        else:
-            console.print("[dim]👋 Мониторинг завершён.[/dim]")
-
-    except KeyboardInterrupt:
-        console.print("\n[yellow]⏸️ Мониторинг прерван пользователем.[/yellow]")
-    except Exception as e:
-        console.print(f"[red]❌ Ошибка мониторинга: {e}[/red]")
 
 
 # ============================================================================
@@ -472,6 +537,9 @@ def show_stats():
 # ============================================================================
 def main():
     """Главная точка входа модуля."""
+    # Устанавливаем обработчик сигнала для Ctrl+C
+    signal.signal(signal.SIGINT, signal_handler)
+    
     parser = argparse.ArgumentParser(
         description="White-sheet-breaker — инструмент против прокрастинации",
         formatter_class=argparse.RawDescriptionHelpFormatter,
