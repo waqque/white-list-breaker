@@ -5,7 +5,6 @@
 
 Поддерживает три типа действий:
 - OPEN_FILE: открыть файл в редакторе (кроссплатформенно)
-- RUN_SHELL: выполнить команду в shell
 - CREATE_TEST: создать файл-шаблон теста
 """
 
@@ -37,8 +36,6 @@ def execute_ritual(ritual: Ritual) -> RitualResult:
         # Выбираем стратегию выполнения на основе action_type
         if ritual.action_type == ActionType.OPEN_FILE:
             evidence = open_file(ritual.target)
-        elif ritual.action_type == ActionType.RUN_SHELL:
-            evidence = run_shell(ritual.target)
         elif ritual.action_type == ActionType.CREATE_TEST:
             evidence = create_test(ritual.target)
         else:
@@ -74,7 +71,7 @@ def open_file(
 ) -> str:
     """
     Кроссплатформенно открывает существующий файл в редакторе или системном приложении.
-    
+
     Если указанный редактор не найден в PATH — автоматически использует
     системное приложение по умолчанию (fallback).
     """
@@ -93,20 +90,20 @@ def open_file(
 
     # Если файл — директория, тоже ошибка
     if path.is_dir():
-        raise BreakerFileNotFoundError(
-            f"Указан путь к директории, а не к файлу: {path}"
-        )
-    
+        raise BreakerFileNotFoundError(f"Указан путь к директории, а не к файлу: {path}")
+
     # Если указан конкретный редактор — пробуем его
     if editor:
         try:
             return _open_in_editor(path, editor, timeout)
         except CommandNotFoundError:
             # Fallback: если редактор не найден, используем системное приложение
-            print(f"  Редактор '{editor}' не найден в PATH. "
-                  f"Открываю системным приложением по умолчанию...")
+            print(
+                f"  Редактор '{editor}' не найден в PATH. "
+                f"Открываю системным приложением по умолчанию..."
+            )
             return _open_system_default(path)
-    
+
     # Иначе — открываем системным приложением по умолчанию
     return _open_system_default(path)
 
@@ -126,6 +123,7 @@ def _open_in_editor(path: Path, editor: str, timeout: int) -> str:
         raise CommandNotFoundError(f"Editor '{editor}' not found. Install it or check PATH.")
     except subprocess.TimeoutExpired:
         raise CommandTimeoutError(f"Editor '{editor}' did not start within {timeout} seconds.")
+
 
 def _open_system_default(path: Path) -> str:
     """Открывает файл системным приложением по умолчанию."""
@@ -153,61 +151,41 @@ def _open_system_default(path: Path) -> str:
     except subprocess.CalledProcessError as e:
         raise CommandFailedError(e.returncode, str(e.stderr))
 
-
-def run_shell(
-    command: str,
-    cwd: Optional[str | Path] = None,
-    timeout: int = 30,
-    capture_output: bool = True,
-) -> str:
-    """
-    Запускает shell-команду с обработкой ошибок и таймаутом.
-
-    """
-    # Проверка на пустую команду
-    if not command or str(command).strip() == "":
-        raise ValueError("Command cannot be empty")
-
-    # Проверка на опасные команды
-    dangerous_commands = ["rm -rf /", "format c:", "del /f /s /q"]
-    if any(dangerous in command.lower() for dangerous in dangerous_commands):
-        raise ValueError(f"Dangerous command detected: {command}")
-
-    print(f"   Выполняю команду: {command}")
-
-    try:
-        result = subprocess.run(
-            command,
-            shell=True,
-            cwd=cwd,
-            timeout=timeout,
-            capture_output=capture_output,
-            text=True,
-        )
-
-        # Если команда вернула ненулевой код — считаем это ошибкой
-        if result.returncode != 0:
-            raise CommandFailedError(result.returncode, result.stderr or "")
-
-        print(f"   Команда выполнена успешно (код: {result.returncode})")
-        return f"shell://{command}"
-
-    except FileNotFoundError:
-        raise CommandNotFoundError(f"Shell or command not found: {command}")
-    except subprocess.TimeoutExpired:
-        raise CommandTimeoutError(f"Command '{command}' timed out after {timeout} seconds.")
-
-
 def create_test(
     path: str | Path,
     content: str = "",
-    template: str = "pytest",
+    template: str = "auto",  
+    open_after_create: bool = True,
 ) -> str:
     """
-    Создаёт файл теста (или любой другой файл) с опциональным шаблоном.
+    Создаёт файл (любой, не только тест) с опциональным шаблоном и открывает его.
 
+    Args:
+        path: Путь, куда создать файл (с любым именем).
+        content: Содержимое файла. Если пусто — используется шаблон.
+        template: Шаблон содержимого. Если "auto" — определяется по расширению.
+                  Доступные: 'pytest', 'unittest', 'python', 'markdown',
+                  'json', 'yaml', 'text', 'empty'.
+        open_after_create: Если True (по умолчанию), файл автоматически
+                          открывается в редакторе после создания.
+
+    Returns:
+        str: URI файла (file:///path/to/file) для evidence_link в xAPI.
     """
     path = Path(path).resolve()
+
+    # Если файл уже существует — просто открываем его
+    if path.exists():
+        if open_after_create:
+            print(f"  Файл уже существует, открываю: {path}")
+            return open_file(path)
+        else:
+            raise FileExistsError(f"File already exists: {path}")
+
+    # Автоопределение шаблона по расширению
+    if template == "auto":
+        template = _detect_template_by_extension(path)
+        print(f"  Автоопределение шаблона: {template}")
 
     # Если контент не задан — берём из шаблона
     if not content:
@@ -216,18 +194,44 @@ def create_test(
     # Создаём родительские директории, если их нет
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Записываем файл (не перезаписываем, если уже существует — safety)
-    if path.exists():
-        raise FileExistsError(f"File already exists: {path}")
-
+    # Записываем файл
     path.write_text(content, encoding="utf-8")
     print(f"  Файл создан: {path}")
+
+    # Открываем файл после создания
+    if open_after_create:
+        return open_file(path)
+
     return f"file://{path}"
+
+
+def _detect_template_by_extension(path: Path) -> str:
+    """Определить шаблон по расширению файла.
+    """
+    suffix = path.suffix.lower()
+    name = path.name.lower()
+
+    # Тестовые файлы — всегда pytest
+    if name.startswith("test_") or name.endswith("_test.py"):
+        return "pytest"
+
+    # По расширению
+    extension_map = {
+        ".py": "python",
+        ".md": "markdown",
+        ".json": "empty",     
+        ".yaml": "empty",     
+        ".yml": "empty",      
+        ".txt": "text",
+    }
+
+    return extension_map.get(suffix, "empty")
 
 
 def _get_template(template: str, module_name: str) -> str:
     """Возвращает содержимое шаблона по имени."""
     templates = {
+        # Шаблоны для тестов
         "pytest": f'''"""Tests for {module_name}."""
 
 
@@ -249,10 +253,47 @@ class Test{module_name.title().replace("_", "")}(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 ''',
+        # Шаблоны для обычных файлов
+        "python": f'''"""Module: {module_name}.
+
+TODO: add module description.
+"""
+
+
+def main():
+    """Entry point."""
+    pass
+
+
+if __name__ == "__main__":
+    main()
+''',
+        "markdown": f'''# {module_name.replace("_", " ").title()}
+
+## Описание
+
+TODO: добавить описание.
+
+## Использование
+
+TODO: добавить примеры использования.
+
+## Заметки
+
+- 
+''',
+        "text": f'''{module_name.replace("_", " ").title()}
+{"=" * len(module_name)}
+
+TODO: добавить содержимое.
+''',
         "empty": "",
     }
 
     if template not in templates:
-        raise ValueError(f"Unknown template: {template}. Available: {list(templates.keys())}")
+        raise ValueError(
+            f"Unknown template: {template}. "
+            f"Available: {list(templates.keys())}"
+        )
 
     return templates[template]
