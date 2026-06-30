@@ -197,8 +197,13 @@ class ActivityMonitor:
         elif result.startswith("open:"):
             # Открыть файл
             file_to_open = Path(result.split(":", 1)[1])
-            console.print(f"[dim]Открываю {file_to_open}...[/dim]")
-            # Можно добавить логику открытия файла
+            console.print(f"[dim]📂 Открываю {file_to_open}...[/dim]")
+            try:
+                from breaker.engine.executor import open_file
+                open_file(file_to_open)
+                console.print(f"[green]Файл {file_to_open} открыт[/green]")
+            except Exception as e:
+                console.print(f"[yellow]Не удалось открыть файл: {e}[/yellow]")
 
         # Для "skip", "text_inserted", "template:..." — просто сбрасываем таймер
 
@@ -208,8 +213,8 @@ class ActivityMonitor:
 
         Returns:
             str: "success" — пользователь начал работать,
-                 "timeout" — сессия завершена из-за неактивности,
-                 "stopped" — мониторинг остановлен вручную.
+                "timeout" — сессия завершена из-за неактивности,
+                "stopped" — мониторинг остановлен вручную.
         """
         self.running = True
         self.session_start_time = time.time()
@@ -230,7 +235,7 @@ class ActivityMonitor:
 
         try:
             while self.running:
-                # 1. Проверяем активность
+                # 1. Проверяем активность (сначала, до обновления last_activity_time)
                 if self._check_activity():
                     self._handle_success()
                     return "success"
@@ -280,8 +285,18 @@ class ActivityMonitor:
                     return "timeout"
 
                 # 6. Если любое изменение файла (даже маленькое) — сбрасываем таймер
+                # НО только если это не результат вставки шаблона
                 if self._check_file_modified():
-                    self.last_activity_time = time.time()
+                    # Проверяем, не было ли недавней вставки шаблона
+                    current_sizes = self._get_file_sizes()
+                    total_diff = sum(
+                        current_sizes.get(f, 0) - self.baseline_sizes.get(f, 0)
+                        for f in self.watched_files
+                    )
+                    # Если разница больше activity_threshold, не сбрасываем таймер
+                    # (это значит, что мы только что вставили шаблон)
+                    if total_diff < self.activity_threshold:
+                        self.last_activity_time = time.time()
 
                 # Ждём перед следующей проверкой
                 time.sleep(self.check_interval)
@@ -295,4 +310,4 @@ class ActivityMonitor:
     def stop_monitoring(self):
         """Остановить мониторинг."""
         self.running = False
-        console.print("[dim]👁️ Мониторинг остановлен.[/dim]")
+        console.print("[dim]Мониторинг остановлен.[/dim]")
