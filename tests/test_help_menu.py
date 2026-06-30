@@ -165,10 +165,10 @@ def test_apply_level1_python_skip():
 
 def test_apply_level1_markdown_template(tmp_path):
     file = tmp_path / "README.md"
-    file.write_text("")
+    file.write_text("", encoding='utf-8')
     result = apply_help_choice(1, file, level=1)
     assert result == "template:default"
-    assert "# Readme" in file.read_text()
+    assert "# Readme" in file.read_text(encoding='utf-8')
 
 
 def test_apply_level1_markdown_heading(tmp_path):

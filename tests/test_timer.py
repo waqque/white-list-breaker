@@ -50,9 +50,10 @@ def test_format_seconds():
     assert _format_seconds(3661) == "61:01"
 
 
+@patch("breaker.ui.timer._is_wsl", return_value=False)
 @patch("breaker.ui.timer.sys.platform", "darwin")
 @patch("breaker.ui.timer.subprocess.run")
-def test_play_sound_macos(mock_run, capsys):
+def test_play_sound_macos(mock_run, mock_is_wsl, capsys):
     """_play_sound() на macOS - используется afplay."""
     from breaker.ui.timer import _play_sound
     with patch("pathlib.Path.exists", return_value=True):
@@ -61,10 +62,10 @@ def test_play_sound_macos(mock_run, capsys):
         call_args = mock_run.call_args
         assert call_args.args[0][0] == "afplay"
 
-
+@patch("breaker.ui.timer._is_wsl", return_value=False)
 @patch("breaker.ui.timer.sys.platform", "linux")
 @patch("breaker.ui.timer.subprocess.run")
-def test_play_sound_linux(mock_run, capsys):
+def test_play_sound_linux(mock_run, mock_is_wsl, capsys):
     """_play_sound() на Linux - перебирает плееры."""
     from breaker.ui.timer import _play_sound
     with patch("pathlib.Path.exists", return_value=True):
