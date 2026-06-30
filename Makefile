@@ -96,6 +96,8 @@ test-engine: ## Запустить тесты движка (executor, templates)
 test-ui: ## Запустить тесты UI (dialog, timer)
 	$(PYTHON) -m pytest $(TESTS_DIR)/test_dialog.py \
 	                   $(TESTS_DIR)/test_timer.py \
+	                   $(TESTS_DIR)/test_help_menu.py \
+	                   $(TESTS_DIR)/test_activity_monitor.py \
 	                   $(TESTS_DIR)/test_template_editor.py -v
 
 demo: ## Демонстрация работы модуля (пример задачи + правило + шаг)

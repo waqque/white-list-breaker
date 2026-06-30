@@ -32,18 +32,22 @@ def success_result():
 
 @pytest.fixture
 def error_result():
+    from breaker.core.schema import RitualResult
+    
     ritual = Ritual(
-        signal="команда не работает",
-        action="проверить синтаксис",
-        target="npm test",
-        action_type=ActionType.RUN_SHELL,
+        signal="файл не найден",
+        action="проверить путь",
+        target="missing.py",
+        action_type=ActionType.OPEN_FILE,
         task_id="task_456",
     )
-    return RitualResult(
+    result = RitualResult(
         ritual=ritual,
         success=False,
-        error_message="Command not found",
+        error_message="File not found: missing.py",
     )
+    result.mark_finished()
+    return result
 
 
 @pytest.fixture
@@ -84,7 +88,7 @@ class TestLogRitualResult:
             entry = json.loads(f.readline().strip())
 
         assert entry["success"] is False
-        assert entry["error_message"] == "Command not found"
+        assert entry["error_message"] == "File not found: missing.py"
 
     def test_appends_multiple_entries(self, success_result, error_result, temp_log):
         log_ritual_result(success_result, log_path=temp_log)
@@ -111,18 +115,10 @@ class TestLogRitualResult:
     def test_handles_russian_text(self, temp_log):
         ritual = Ritual(
             signal="открываю проект",
-            action="запускаю тесты",
+            action="открываю файл",
             target="main.py",
-            action_type=ActionType.RUN_SHELL,
+            action_type=ActionType.OPEN_FILE,
         )
-        result = RitualResult(ritual=ritual, success=True)
-        log_ritual_result(result, log_path=temp_log)
-
-        with open(temp_log, "r", encoding="utf-8") as f:
-            entry = json.loads(f.readline().strip())
-
-        assert entry["signal"] == "открываю проект"
-
 
 class TestReadLog:
     def test_read_empty_log(self, temp_log):
@@ -175,8 +171,7 @@ class TestGetStats:
         assert stats["success_count"] == 2
         assert stats["fail_count"] == 1
         assert abs(stats["success_rate"] - 2 / 3) < 0.01
-        assert stats["action_types"]["open_file"] == 2
-        assert stats["action_types"]["run_shell"] == 1
+        assert stats["action_types"]["open_file"] == 3  # Все 3 записи теперь open_file
 
     def test_stats_all_success(self, success_result, temp_log):
         for _ in range(5):

@@ -3,8 +3,8 @@
 
 Участники:
 - А (Core): schema.py, tracker.py, xapi_client.py
-- Б (Engine/Storage): executor.py, templates.py
-- В (UI): dialog.py, timer.py, template_editor.py
+- Б (Engine/Storage): executor.py, templates.py, file_templates.py
+- В (UI): dialog.py, timer.py, template_editor.py, activity_monitor.py, help_menu.py
 """
 
 import argparse
@@ -20,6 +20,13 @@ from rich.table import Table
 from breaker.ui.dialog import run_dialog
 from breaker.ui.timer import run_timer_with_prompt
 from breaker.ui.template_editor import main_menu as editor_menu
+from breaker.ui.activity_monitor import ActivityMonitor
+from breaker.ui.help_menu import (
+    show_help_level1,
+    show_help_level2,
+    apply_help_choice,
+    show_success_message,
+)
 
 # Импорт модулей Участника Б (Engine + Storage)
 from breaker.engine.executor import execute_ritual
@@ -78,14 +85,14 @@ def show_main_menu():
 
 
 # ============================================================================
-# Полный цикл: правило → выполнение → таймер → лог → xAPI
+# Полный цикл: правило → выполнение → (опционально таймер) → наблюдение → лог → xAPI
 # ============================================================================
 def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
     """Выполнить полный цикл работы модуля.
 
     Args:
         ritual: Правило "если-то" для выполнения.
-        skip_timer: Если True — не запускать Pomodoro-таймер.
+        skip_timer: Если True — не спрашивать про Pomodoro-таймер.
 
     Returns:
         RitualResult с результатом выполнения.
@@ -112,19 +119,23 @@ def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
     else:
         console.print(f"[red]❌ Ошибка: {result.error_message}[/red]")
 
-    # Шаг 3: Pomodoro-таймер (Участник В) — только если действие успешно
+    # Шаг 3: Опциональный Pomodoro-таймер + фоновое наблюдение
     if result.success and not skip_timer:
         console.print()
-        console.print("[bold cyan]Шаг 3/4: Pomodoro-таймер[/bold cyan]")
-        
-        # Спрашиваем пользователя, хочет ли он запустить таймер
-        run_timer = Confirm.ask(
-            "[yellow]Запустить Pomodoro-таймер для фокусировки?[/yellow]",
-            default=True
-        )
-        
-        if run_timer:
-            console.print("[dim]Теперь сосредоточься на задаче![/dim]")
+        console.print("[bold cyan]Шаг 3/4: Что дальше?[/bold cyan]")
+
+        # Спрашиваем только про таймер
+        try:
+            start_timer = Confirm.ask(
+                "\n[cyan]Запустить Pomodoro-таймер для концентрации?[/cyan]",
+                default=True,
+            )
+        except (KeyboardInterrupt, EOFError):
+            start_timer = False
+
+        if start_timer:
+            console.print()
+            console.print("[dim]Сосредоточься на задаче![/dim]")
             try:
                 timer_completed = run_timer_with_prompt()
                 if timer_completed:
@@ -133,8 +144,12 @@ def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
                     console.print("[yellow]⏸️ Pomodoro прерван.[/yellow]")
             except Exception as e:
                 console.print(f"[yellow]⚠️ Ошибка таймера: {e}[/yellow]")
-        else:
-            console.print("[dim]⏭️ Пропускаем Pomodoro-таймер.[/dim]")
+
+        # ВСЕГДА запускаем фоновое наблюдение (если это файл)
+        if ritual.action_type in [ActionType.OPEN_FILE, ActionType.CREATE_TEST]:
+            console.print()
+            console.print("[dim]Модуль поможет, если вы зависнете.[/dim]")
+            run_with_monitoring(ritual)
 
     # Шаг 4: Логирование + xAPI (Участник А)
     console.print()
@@ -173,6 +188,54 @@ def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
         )
 
     return result
+
+
+# ============================================================================
+# Фоновое наблюдение с помощью ActivityMonitor
+# ============================================================================
+def run_with_monitoring(ritual: Ritual):
+    """Запустить фоновое наблюдение за активностью пользователя.
+
+    Args:
+        ritual: Правило, которое было выполнено.
+    """
+    # Определяем файлы для наблюдения
+    watched_files = []
+    if ritual.action_type in [ActionType.OPEN_FILE, ActionType.CREATE_TEST]:
+        watched_files.append(Path(ritual.target))
+
+    if not watched_files:
+        console.print("[yellow]⚠️ Нет файлов для наблюдения[/yellow]")
+        return
+
+    # Создаём и запускаем монитор
+    monitor = ActivityMonitor(
+        watched_files=watched_files,
+        idle_threshold_level1=60,   # 1 минута
+        idle_threshold_level2=180,  # 3 минуты
+        idle_threshold_timeout=300, # 5 минут
+        activity_threshold=100,     # 100 символов
+        check_interval=10,
+        help_level1_callback=lambda: show_help_level1(watched_files[0]),
+        help_level2_callback=lambda: show_help_level2(watched_files[0]),
+        apply_choice_callback=lambda choice, level: apply_help_choice(choice, watched_files[0], level),
+        success_callback=lambda info: show_success_message(watched_files[0], info),
+    )
+
+    try:
+        result = monitor.start_monitoring()
+
+        if result == "success":
+            console.print("[green]🎉 Отлично! Вы начали работу.[/green]")
+        elif result == "timeout":
+            console.print("[yellow]⏰ Сессия завершена из-за неактивности.[/yellow]")
+        else:
+            console.print("[dim]👋 Мониторинг завершён.[/dim]")
+
+    except KeyboardInterrupt:
+        console.print("\n[yellow]⏸️ Мониторинг прерван пользователем.[/yellow]")
+    except Exception as e:
+        console.print(f"[red]❌ Ошибка мониторинга: {e}[/red]")
 
 
 # ============================================================================
@@ -265,15 +328,13 @@ def mode_use_template(skip_timer: bool = False):
     action = Prompt.ask("[yellow]Действие (то...)[/yellow]", default=template.action)
     target = Prompt.ask("[yellow]Цель (ресурс)[/yellow]", default=template.target)
 
-    # Конвертируем шаблон в Ritual (используем метод to_ritual от Участника Б)
+    # Конвертируем шаблон в Ritual
     try:
         ritual = template.to_ritual()
-        # Применяем адаптированные значения
         ritual.signal = signal
         ritual.action = action
         ritual.target = target
     except (ValueError, AttributeError) as e:
-        # Если метод to_ritual() не реализован — создаём вручную
         console.print(f"[yellow]⚠️ {e}. Создаём правило вручную.[/yellow]")
         try:
             action_type = ActionType(template.action_type)
@@ -334,7 +395,7 @@ def run_demo():
         )
     )
 
-    # Выполняем полный цикл (без таймера для быстрого демо)
+    # Выполняем полный цикл (без таймера и наблюдения для быстрого демо)
     run_full_cycle(ritual, skip_timer=True)
 
     # Показываем созданный файл
@@ -418,7 +479,7 @@ def main():
 Примеры использования:
   python -m breaker                  # Интерактивный режим
   python -m breaker --demo           # Демо-режим
-  python -m breaker --no-timer       # Без Pomodoro-таймера
+  python -m breaker --no-timer       # Без Pomodoro-таймера и наблюдения
   python -m breaker --demo --no-timer  # Быстрое демо
         """,
     )
@@ -430,7 +491,7 @@ def main():
     parser.add_argument(
         "--no-timer",
         action="store_true",
-        help="Не запускать Pomodoro-таймер после выполнения ритуала",
+        help="Не запускать Pomodoro-таймер и наблюдение после выполнения ритуала",
     )
     args = parser.parse_args()
 
