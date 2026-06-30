@@ -236,7 +236,14 @@ class ActivityMonitor:
         self.running = False
 
     def start_monitoring(self) -> str:
-        """Запустить мониторинг активности."""
+        """Запустить мониторинг активности.
+        
+        Returns:
+            str: "success" — пользователь начал работать,
+                "timeout" — сессия завершена из-за неактивности,
+                "interrupted" — прерван пользователем,
+                "stopped" — мониторинг остановлен вручную.
+        """
         self.running = True
         self.session_start_time = time.time()
         self.last_activity_time = time.time()
@@ -269,9 +276,9 @@ class ActivityMonitor:
 
                 idle_time = time.time() - self.last_activity_time
 
-                # Уровень 1
+                # Уровень 1: первое напоминание
                 if self.help_level == 0 and idle_time >= self.idle_threshold_level1:
-                    console.print(f"\n[dim]Похоже, что вы ничего не делаете")
+                    console.print(f"\n[dim]⏰ Бездействие {int(idle_time)} сек. Показываю помощь уровня 1[/dim]")
                     result = self._handle_help_level1()
                     self._process_help_result(result)
 
@@ -281,17 +288,18 @@ class ActivityMonitor:
                     if self.pending_action:
                         self.baseline_sizes = self._get_file_sizes()
                         self.last_activity_time = time.time()
-                        self.help_level = 0
+                        # help_level остается 1 (установлено в _handle_help_level1)
                         self.pending_action = False
+                        console.print("[dim]✅ Таймер бездействия сброшен (уровень 1)[/dim]")
                         continue
                     elif result == "timer":
                         self.last_activity_time = time.time()
-                        self.help_level = 0
+                        # help_level остается 1
                         continue
 
-                # Уровень 2
+                # Уровень 2: второе напоминание
                 elif self.help_level == 1 and idle_time >= self.idle_threshold_level2:
-                    console.print(f"\n[dim]Похоже, что вы снова ничего не делаете")
+                    console.print(f"\n[dim]⏰ Бездействие {int(idle_time)} сек. Показываю помощь уровня 2[/dim]")
                     result = self._handle_help_level2()
                     self._process_help_result(result)
 
@@ -301,15 +309,16 @@ class ActivityMonitor:
                     if self.pending_action:
                         self.baseline_sizes = self._get_file_sizes()
                         self.last_activity_time = time.time()
-                        self.help_level = 0
+                        # help_level остается 2 (установлено в _handle_help_level2)
                         self.pending_action = False
+                        console.print("[dim]✅ Таймер бездействия сброшен (уровень 2)[/dim]")
                         continue
                     elif result == "timer":
                         self.last_activity_time = time.time()
-                        self.help_level = 0
+                        # help_level остается 2
                         continue
 
-                # Таймаут
+                # Таймаут: слишком долго без активности
                 elif self.help_level >= 1 and idle_time >= self.idle_threshold_timeout:
                     console.print()
                     console.print(
@@ -317,21 +326,27 @@ class ActivityMonitor:
                     )
                     return "timeout"
 
-                # Проверяем изменения файла
+                # Проверяем изменения файла (пользователь начал работать)
                 if self._check_file_modified():
                     current_sizes = self._get_file_sizes()
                     total_diff = sum(
                         current_sizes.get(f, 0) - self.baseline_sizes.get(f, 0)
                         for f in self.watched_files
                     )
+                    # Если изменения есть, но меньше порога — это ручная активность
                     if 0 < total_diff < self.activity_threshold:
+                        console.print(f"[dim]📝 Обнаружены изменения ({total_diff} символов)[/dim]")
                         self.last_activity_time = time.time()
+                        # Сбрасываем уровень помощи, потому что пользователь начал работать
                         self.help_level = 0
+                        # Обновляем baseline
                         self.baseline_sizes = self._get_file_sizes()
+                        # Проверяем, не набралось ли достаточно
                         if self._check_activity():
                             self._handle_success()
                             return "success"
 
+                # Ждём перед следующей проверкой
                 time.sleep(self.check_interval)
 
         except KeyboardInterrupt:
