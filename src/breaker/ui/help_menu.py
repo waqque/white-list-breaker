@@ -21,7 +21,6 @@ from breaker.engine.file_templates import FileTemplates
 console = Console()
 
 
-
 def _get_file_type(file_path: Path) -> str:
     """Определить тип файла по расширению."""
     suffix = file_path.suffix.lower()
@@ -57,7 +56,7 @@ def show_help_level1(file_path: Path) -> int:
     console.print(
         Panel(
             "[bold yellow]Похоже, вы пока не начали[/bold yellow]\n\n"
-            f"Прошла минута, а файл [cyan]{file_path.name}[/cyan] не изменился.\n"
+            f"Файл [cyan]{file_path.name}[/cyan] не изменился.\n"
             "Нужна помощь?",
             border_style="yellow",
             padding=(1, 2),
@@ -96,7 +95,6 @@ def show_help_level1(file_path: Path) -> int:
     max_choice = _get_max_choice_level1(file_type, is_test)
     choice = IntPrompt.ask("Выберите действие", default=max_choice)
 
-    # Валидация
     while choice < 1 or choice > max_choice:
         console.print(f"[red]Выберите число от 1 до {max_choice}[/red]")
         choice = IntPrompt.ask("Выберите действие", default=max_choice)
@@ -114,7 +112,6 @@ def _get_max_choice_level1(file_type: str, is_test: bool) -> int:
         return 3
     else:
         return 2
-
 
 
 def show_help_level2(file_path: Path) -> int:
@@ -154,7 +151,6 @@ def show_help_level2(file_path: Path) -> int:
     return choice
 
 
-
 def apply_help_choice(choice: int, file_path: Path, level: int = 1) -> str:
     """Применить выбор пользователя из меню помощи.
 
@@ -185,7 +181,6 @@ def _apply_level1_choice(choice: int, file_path: Path, file_type: str, is_test: 
 
     if file_type == 'python':
         if is_test:
-            # Тестовый файл
             if choice == 1:
                 return _insert_template(file_path, 'test')
             elif choice == 2:
@@ -195,7 +190,6 @@ def _apply_level1_choice(choice: int, file_path: Path, file_type: str, is_test: 
             elif choice == 4:
                 return "skip"
         else:
-            # Обычный Python-файл
             if choice == 1:
                 return _insert_template(file_path, 'function')
             elif choice == 2:
@@ -243,7 +237,6 @@ def _apply_level2_choice(choice: int, file_path: Path) -> str:
     elif choice == 3:
         return _insert_text(file_path, "\nassert True\n")
     elif choice == 4:
-        # Открыть README
         readme = Path("README.md")
         if readme.exists():
             return f"open:{readme}"
@@ -256,17 +249,8 @@ def _apply_level2_choice(choice: int, file_path: Path) -> str:
     return "skip"
 
 
-
 def _insert_template(file_path: Path, template_type: str) -> str:
-    """Вставить шаблон в файл.
-
-    Args:
-        file_path: Путь к файлу.
-        template_type: Тип шаблона ("function", "class", "test", "default").
-
-    Returns:
-        str: "template:<type>" при успехе, "skip" при ошибке.
-    """
+    """Вставить шаблон в файл."""
     template = FileTemplates.get_template(file_path, template_type)
 
     if template is None:
@@ -277,11 +261,9 @@ def _insert_template(file_path: Path, template_type: str) -> str:
         if file_path.exists():
             content = file_path.read_text(encoding='utf-8')
             if content.strip():
-                # Файл не пустой — добавляем в конец
                 file_path.write_text(content + "\n" + template, encoding='utf-8')
                 console.print(f"[green]Шаблон '{template_type}' добавлен в конец файла[/green]")
             else:
-                # Файл пустой — записываем шаблон
                 file_path.write_text(template, encoding='utf-8')
                 console.print(f"[green]Шаблон '{template_type}' вставлен в пустой файл[/green]")
         else:
@@ -310,14 +292,8 @@ def _insert_text(file_path: Path, text: str) -> str:
         return "skip"
 
 
-
 def show_success_message(file_path: Path, activity_info: dict):
-    """Показать сообщение об успешном начале работы.
-
-    Args:
-        file_path: Путь к файлу.
-        activity_info: Информация об активности (размер, время и т.д.).
-    """
+    """Показать сообщение об успешном начале работы."""
     console.print()
     console.print(
         Panel.fit(

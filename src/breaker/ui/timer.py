@@ -1,6 +1,4 @@
-# Помодоро-таймер с выбором длительности пользователем.
-# После подтверждения правила «если–то» пользователь сам выбирает, сколько минут работать.
-# Таймер помогает сосредоточиться и не отвлекаться.
+"""Помодоро-таймер с выбором длительности пользователем."""
 
 import os
 import time
@@ -20,21 +18,30 @@ from rich.prompt import IntPrompt
 
 console = Console()
 
+# Глобальная переменная для управления паузой прогресса
+_timer_progress_paused = False
+_timer_progress = None
+_timer_task = None
+
+
+def set_timer_progress_paused(paused: bool):
+    """Приостановить/возобновить обновление прогресса таймера."""
+    global _timer_progress_paused
+    _timer_progress_paused = paused
+
 
 def _format_seconds(seconds: int) -> str:
-    # Форматировать секунды в MM:SS
+    """Форматировать секунды в MM:SS."""
     minutes = seconds // 60
     secs = seconds % 60
     return f"{minutes:02d}:{secs:02d}"
 
 
 def _is_wsl() -> bool:
-    # Определить, запущен ли код в WSL (Windows Subsystem for Linux)
-    # переменная окружения WSL_DISTRO_NAME
+    """Определить, запущен ли код в WSL."""
     if os.environ.get("WSL_DISTRO_NAME"):
         return True
 
-    # /proc/version содержит "Microsoft" или "WSL"
     try:
         with open("/proc/version", "r", encoding="utf-8") as f:
             version = f.read().lower()
@@ -47,11 +54,7 @@ def _is_wsl() -> bool:
 
 
 def _linux_path_to_windows(linux_path: Path) -> str:
-    """Конвертировать Linux-путь (/mnt/c/...) в Windows-путь (C:\\...).
-
-    Использует wslpath если доступен, иначе ручная конвертация.
-    """
-    # Пробуем wslpath
+    """Конвертировать Linux-путь в Windows-путь."""
     try:
         result = subprocess.run(
             ["wslpath", "-w", str(linux_path)],
@@ -64,50 +67,38 @@ def _linux_path_to_windows(linux_path: Path) -> str:
     except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
         pass
 
-    # Fallback: ручная конвертация
-    # На Windows Path("/mnt/c/...") становится WindowsPath с путём \mnt\c\...
-    # Нужно нормализовать путь к POSIX-формату
     path_str = str(linux_path)
-    
-    # Если путь начинается с \ (Windows), заменяем на /
     if path_str.startswith("\\"):
         path_str = "/" + path_str[1:]
-    
-    # Заменяем все \ на /
     path_str = path_str.replace("\\", "/")
-    
-    # Теперь path_str в POSIX-формате: /mnt/c/Users/test/file.wav
-    
+
     if path_str.startswith("/mnt/"):
-        drive_letter = path_str[5].upper()  # 'c' → 'C'
-        rest = path_str[7:]  # 'Users/test/file.wav'
-        # Заменяем '/' на '\\' для Windows
+        drive_letter = path_str[5].upper()
+        rest = path_str[7:]
         windows_path = f"{drive_letter}:\\{rest.replace('/', chr(92))}"
         return windows_path
 
-    # Не /mnt/ — возвращаем как есть
     return path_str
 
+
 def _play_sound() -> None:
-    """Воспроизвести звуковой сигнал (кроссплатформенно, включая WSL)."""
+    """Воспроизвести звуковой сигнал."""
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
     sound_path = base_dir / "data" / "sounds" / "wow-sound-effect.wav"
 
-    # Проверка на WSL — используем Windows-механизмы
     if _is_wsl():
         _play_sound_wsl(sound_path)
         return
 
     try:
         if sound_path.exists():
-            if sys.platform == "darwin":  # macOS
+            if sys.platform == "darwin":
                 subprocess.run(
                     ["afplay", str(sound_path)],
                     capture_output=True,
                     timeout=10,
                 )
-            elif sys.platform == "win32":  # Windows
-                # Используем PowerShell с SoundPlayer (надёжнее для WAV)
+            elif sys.platform == "win32":
                 subprocess.run(
                     [
                         "powershell",
@@ -117,7 +108,7 @@ def _play_sound() -> None:
                     capture_output=True,
                     timeout=10,
                 )
-            else:  # Linux
+            else:
                 for player in ["paplay", "mpv", "ffplay", "aplay"]:
                     try:
                         subprocess.run(
@@ -133,20 +124,16 @@ def _play_sound() -> None:
             _play_system_sound()
     except Exception as e:
         console.print(f"[dim]Ошибка воспроизведения: {e}[/dim]")
-        # Fallback на системный звук
         _play_system_sound()
 
 
 def _play_sound_wsl(sound_path: Path) -> None:
-    """Воспроизвести звук в WSL через Windows PowerShell."""
+    """Воспроизвести звук в WSL."""
     try:
-        # Конвертируем Linux-путь в Windows-путь
         if sound_path.exists():
             windows_path = _linux_path_to_windows(sound_path)
-            # Экранируем обратные слеши для PowerShell
             windows_path_escaped = windows_path.replace("\\", "\\\\")
 
-            # Вызываем powershell.exe (он доступен из WSL!)
             subprocess.run(
                 [
                     "powershell.exe",
@@ -166,7 +153,7 @@ def _play_sound_wsl(sound_path: Path) -> None:
 
 
 def _play_system_sound() -> None:
-    # Воспроизвести системный звук ОС (если свой не найден)
+    """Воспроизвести системный звук."""
     try:
         if sys.platform == "darwin":
             subprocess.run(
@@ -176,7 +163,6 @@ def _play_system_sound() -> None:
             )
         elif sys.platform == "win32":
             import winsound
-
             winsound.Beep(1000, 500)
         else:
             print("\a", end="", flush=True)
@@ -185,21 +171,19 @@ def _play_system_sound() -> None:
 
 
 def _play_system_sound_wsl() -> None:
-    """Системный звук в WSL через Windows."""
+    """Системный звук в WSL."""
     try:
-        # Используем стандартный Windows beep через PowerShell
         subprocess.run(
             ["powershell.exe", "-c", "[Console]::Beep(1000, 500)"],
             capture_output=True,
             timeout=5,
         )
     except Exception:
-        # Последний fallback — bell символ
         print("\a", end="", flush=True)
 
 
 def ask_duration(default_minutes: int = 5) -> int:
-    # Спросить у пользователя, сколько минут работать
+    """Спросить у пользователя, сколько минут работать."""
     console.print()
     console.print("[bold cyan]Сколько минут будем работать?[/bold cyan]")
     console.print("[dim]Рекомендации:[/dim]")
@@ -229,7 +213,9 @@ def ask_duration(default_minutes: int = 5) -> int:
 
 
 def pomodoro_timer(minutes: int = 5) -> bool:
-    # Запустить помодоро-таймер с обратным отсчётом
+    """Запустить помодоро-таймер с обратным отсчётом."""
+    global _timer_progress, _timer_task, _timer_progress_paused
+    
     total_seconds = minutes * 60
 
     console.print()
@@ -249,13 +235,19 @@ def pomodoro_timer(minutes: int = 5) -> bool:
         console=console,
         refresh_per_second=1,
     ) as progress:
+        _timer_progress = progress
         task = progress.add_task(
             f"Работаем... ({_format_seconds(total_seconds)})",
             total=total_seconds,
         )
+        _timer_task = task
 
         try:
             for remaining in range(total_seconds, 0, -1):
+                # Проверяем паузу
+                while _timer_progress_paused:
+                    time.sleep(0.1)
+                
                 progress.update(
                     task,
                     description=f"Осталось: {_format_seconds(remaining)}",
@@ -264,9 +256,13 @@ def pomodoro_timer(minutes: int = 5) -> bool:
                 progress.update(task, advance=1)
         except KeyboardInterrupt:
             console.print("\n[yellow]Таймер прерван пользователем.[/yellow]")
+            _timer_progress = None
+            _timer_task = None
             return False
 
     progress.update(task, description="Готово!", completed=total_seconds)
+    _timer_progress = None
+    _timer_task = None
 
     console.print()
     console.print("[bold green]Время вышло! Отличная работа![/bold green]")
@@ -286,7 +282,7 @@ def pomodoro_timer(minutes: int = 5) -> bool:
 
 
 def run_timer_with_prompt() -> bool:
-    # Полный цикл: спросить минуты -> запустить таймер
+    """Полный цикл: спросить минуты -> запустить таймер."""
     console.print(
         Panel(
             "[bold cyan]Помодоро-таймер[/bold cyan]\n\n"
@@ -303,5 +299,4 @@ def run_timer_with_prompt() -> bool:
 
 
 if __name__ == "__main__":
-    # При прямом запуске — спрашиваем минуты и запускаем таймер
     run_timer_with_prompt()

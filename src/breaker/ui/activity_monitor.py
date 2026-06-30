@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Optional, Callable
 
 from rich.console import Console
+from rich.panel import Panel
 
 console = Console()
 
@@ -40,6 +41,7 @@ class ActivityMonitor:
         help_level2_callback: Optional[Callable] = None,
         apply_choice_callback: Optional[Callable] = None,
         success_callback: Optional[Callable] = None,
+        progress_refresh_callback: Optional[Callable] = None,
     ):
         """
         Args:
@@ -53,6 +55,7 @@ class ActivityMonitor:
             help_level2_callback: Функция для показа меню уровня 2. Возвращает int (выбор).
             apply_choice_callback: Функция для применения выбора. Принимает (choice, level), возвращает str.
             success_callback: Функция для показа сообщения об успехе. Принимает dict с инфо об активности.
+            progress_refresh_callback: Функция для приостановки/возобновления обновления прогресса.
         """
         self.watched_files = watched_files
         self.idle_threshold_level1 = idle_threshold_level1
@@ -65,14 +68,16 @@ class ActivityMonitor:
         self.help_level2_callback = help_level2_callback
         self.apply_choice_callback = apply_choice_callback
         self.success_callback = success_callback
+        self.progress_refresh_callback = progress_refresh_callback
 
         self.running = False
-        self.help_level = 0  # 0 = не предлагали, 1 = уровень 1, 2 = уровень 2
+        self.help_level = 0
         self.last_activity_time = time.time()
         self.session_start_time = time.time()
         self.baseline_sizes = self._get_file_sizes()
-        self.help_count = 0  # Сколько раз предлагали помощь
-
+        self.help_count = 0
+        self.pending_action = False
+        self.interrupted = False
 
     def _get_file_sizes(self) -> dict[Path, int]:
         """Получить текущие размеры отслеживаемых файлов."""
@@ -109,11 +114,7 @@ class ActivityMonitor:
         }
 
     def _check_activity(self) -> bool:
-        """Проверить, была ли достаточная активность.
-
-        Returns:
-            True если файл вырос на activity_threshold символов.
-        """
+        """Проверить, была ли достаточная активность."""
         info = self._get_activity_info()
         return info["total_chars_added"] >= self.activity_threshold
 
@@ -127,75 +128,92 @@ class ActivityMonitor:
                 return True
         return False
 
-    def _handle_help_level1(self) -> str:
-        """Показать меню уровня 1 и обработать выбор.
+    def _pause_progress(self):
+        """Приостановить обновление прогресса."""
+        if self.progress_refresh_callback:
+            try:
+                self.progress_refresh_callback(True)
+            except Exception:
+                pass
 
-        Returns:
-            str: результат обработки ("timer", "skip", "text_inserted", "template:...")
-        """
+    def _resume_progress(self):
+        """Возобновить обновление прогресса."""
+        if self.progress_refresh_callback:
+            try:
+                self.progress_refresh_callback(False)
+            except Exception:
+                pass
+
+    def _show_help_menu_safe(self, level: int) -> str:
+        """Показать меню помощи безопасно (с приостановкой прогресса)."""
+        self._pause_progress()
+        
+        try:
+            console.print()
+            console.print(
+                Panel(
+                    "[bold yellow]💡 Помощь при бездействии[/bold yellow]",
+                    border_style="yellow",
+                )
+            )
+            
+            if level == 1:
+                if self.help_level1_callback:
+                    choice = self.help_level1_callback()
+                else:
+                    from breaker.ui.help_menu import show_help_level1
+                    choice = show_help_level1(self.watched_files[0])
+            else:
+                if self.help_level2_callback:
+                    choice = self.help_level2_callback()
+                else:
+                    from breaker.ui.help_menu import show_help_level2
+                    choice = show_help_level2(self.watched_files[0])
+            
+            if self.apply_choice_callback:
+                result = self.apply_choice_callback(choice, level=level)
+            else:
+                result = "skip"
+                
+            return result
+            
+        finally:
+            self._resume_progress()
+            console.print()
+
+    def _handle_help_level1(self) -> str:
+        """Показать меню уровня 1 и обработать выбор."""
         self.help_count += 1
         self.help_level = 1
-
-        if self.help_level1_callback:
-            choice = self.help_level1_callback()
-        else:
-            # Встроенный fallback (если колбэк не передан)
-            from breaker.ui.help_menu import show_help_level1
-            choice = show_help_level1(self.watched_files[0])
-
-        if self.apply_choice_callback:
-            return self.apply_choice_callback(choice, level=1)
-
-        return "skip"
+        return self._show_help_menu_safe(1)
 
     def _handle_help_level2(self) -> str:
-        """Показать меню уровня 2 и обработать выбор.
-
-        Returns:
-            str: результат обработки ("timer", "skip", "text_inserted")
-        """
+        """Показать меню уровня 2 и обработать выбор."""
         self.help_count += 1
         self.help_level = 2
-
-        if self.help_level2_callback:
-            choice = self.help_level2_callback()
-        else:
-            from breaker.ui.help_menu import show_help_level2
-            choice = show_help_level2(self.watched_files[0])
-
-        if self.apply_choice_callback:
-            return self.apply_choice_callback(choice, level=2)
-
-        return "skip"
+        return self._show_help_menu_safe(2)
 
     def _handle_success(self):
         """Показать сообщение об успехе."""
         info = self._get_activity_info()
-
         if self.success_callback:
             self.success_callback(info)
-        else:
-            console.print()
-            console.print("[bold green]Отлично! Работа началась.[/bold green]")
-
 
     def _process_help_result(self, result: str):
-        """Обработать результат выбора из меню помощи.
-
-        Args:
-            result: Строка-результат ("timer", "skip", "text_inserted", "template:...")
-        """
+        """Обработать результат выбора из меню помощи."""
         if result == "timer":
-            # Запустить Pomodoro-таймер
             console.print("\n[bold cyan]Запуск Pomodoro-таймера...[/bold cyan]")
             try:
                 from breaker.ui.timer import run_timer_with_prompt
                 run_timer_with_prompt()
+            except KeyboardInterrupt:
+                console.print("\n[yellow]Таймер прерван пользователем.[/yellow]")
+                self.interrupted = True
             except Exception as e:
                 console.print(f"[yellow]Ошибка таймера: {e}[/yellow]")
+            self.pending_action = False
 
         elif result.startswith("open:"):
-            # Открыть файл
             file_to_open = Path(result.split(":", 1)[1])
             console.print(f"[dim]📂 Открываю {file_to_open}...[/dim]")
             try:
@@ -204,24 +222,29 @@ class ActivityMonitor:
                 console.print(f"[green]Файл {file_to_open} открыт[/green]")
             except Exception as e:
                 console.print(f"[yellow]Не удалось открыть файл: {e}[/yellow]")
+            self.pending_action = False
 
-        # Для "skip", "text_inserted", "template:..." — просто сбрасываем таймер
+        elif result in ("text_inserted", "skip"):
+            self.pending_action = True
 
+        elif result.startswith("template:"):
+            self.pending_action = True
+
+    def set_interrupted(self):
+        """Установить флаг прерывания."""
+        self.interrupted = True
+        self.running = False
 
     def start_monitoring(self) -> str:
-        """Запустить мониторинг активности.
-
-        Returns:
-            str: "success" — пользователь начал работать,
-                "timeout" — сессия завершена из-за неактивности,
-                "stopped" — мониторинг остановлен вручную.
-        """
+        """Запустить мониторинг активности."""
         self.running = True
         self.session_start_time = time.time()
         self.last_activity_time = time.time()
         self.baseline_sizes = self._get_file_sizes()
         self.help_level = 0
         self.help_count = 0
+        self.pending_action = False
+        self.interrupted = False
 
         console.print()
         console.print("[bold cyan]Наблюдаю за вашей активностью...[/bold cyan]")
@@ -232,78 +255,88 @@ class ActivityMonitor:
         for f in self.watched_files:
             console.print(f"[dim]  → {f}[/dim]")
         console.print()
+        console.print("[dim](Нажмите Ctrl+C для прерывания)[/dim]")
+        console.print()
 
         try:
             while self.running:
-                # 1. Проверяем активность (сначала, до обновления last_activity_time)
+                if self.interrupted:
+                    return "interrupted"
+
                 if self._check_activity():
                     self._handle_success()
                     return "success"
 
-                # 2. Проверяем время бездействия
                 idle_time = time.time() - self.last_activity_time
 
-                # 3. Уровень 1: первое напоминание
+                # Уровень 1
                 if self.help_level == 0 and idle_time >= self.idle_threshold_level1:
+                    console.print(f"\n[dim]Похоже, что вы ничего не делаете")
                     result = self._handle_help_level1()
                     self._process_help_result(result)
 
-                    if result == "timer":
-                        if self._check_activity():
-                            self._handle_success()
-                            return "success"
-                        self.last_activity_time = time.time()
-                    elif result == "skip":
-                        self.last_activity_time = time.time()
-                    else:
-                        # Вставили шаблон/текст — обновляем baseline
+                    if self.interrupted:
+                        return "interrupted"
+
+                    if self.pending_action:
                         self.baseline_sizes = self._get_file_sizes()
                         self.last_activity_time = time.time()
+                        self.help_level = 0
+                        self.pending_action = False
+                        continue
+                    elif result == "timer":
+                        self.last_activity_time = time.time()
+                        self.help_level = 0
+                        continue
 
-                # 4. Уровень 2: второе напоминание
+                # Уровень 2
                 elif self.help_level == 1 and idle_time >= self.idle_threshold_level2:
+                    console.print(f"\n[dim]Похоже, что вы снова ничего не делаете")
                     result = self._handle_help_level2()
                     self._process_help_result(result)
 
-                    if result == "timer":
-                        if self._check_activity():
-                            self._handle_success()
-                            return "success"
-                        self.last_activity_time = time.time()
-                    elif result == "skip":
-                        self.last_activity_time = time.time()
-                    else:
+                    if self.interrupted:
+                        return "interrupted"
+
+                    if self.pending_action:
                         self.baseline_sizes = self._get_file_sizes()
                         self.last_activity_time = time.time()
+                        self.help_level = 0
+                        self.pending_action = False
+                        continue
+                    elif result == "timer":
+                        self.last_activity_time = time.time()
+                        self.help_level = 0
+                        continue
 
-                # 5. Таймаут: слишком долго без активности
+                # Таймаут
                 elif self.help_level >= 1 and idle_time >= self.idle_threshold_timeout:
                     console.print()
                     console.print(
-                        "[yellow]Сессия завершена из-за длительного бездействия.[/yellow]"
+                        f"[yellow]Сессия завершена из-за длительного бездействия ({int(idle_time)} сек).[/yellow]"
                     )
                     return "timeout"
 
-                # 6. Если любое изменение файла (даже маленькое) — сбрасываем таймер
-                # НО только если это не результат вставки шаблона
+                # Проверяем изменения файла
                 if self._check_file_modified():
-                    # Проверяем, не было ли недавней вставки шаблона
                     current_sizes = self._get_file_sizes()
                     total_diff = sum(
                         current_sizes.get(f, 0) - self.baseline_sizes.get(f, 0)
                         for f in self.watched_files
                     )
-                    # Если разница больше activity_threshold, не сбрасываем таймер
-                    # (это значит, что мы только что вставили шаблон)
-                    if total_diff < self.activity_threshold:
+                    if 0 < total_diff < self.activity_threshold:
                         self.last_activity_time = time.time()
+                        self.help_level = 0
+                        self.baseline_sizes = self._get_file_sizes()
+                        if self._check_activity():
+                            self._handle_success()
+                            return "success"
 
-                # Ждём перед следующей проверкой
                 time.sleep(self.check_interval)
 
         except KeyboardInterrupt:
             console.print("\n[yellow]Мониторинг прерван пользователем.[/yellow]")
-            return "stopped"
+            return "interrupted"
 
         return "stopped"
 
