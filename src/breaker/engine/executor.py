@@ -154,27 +154,12 @@ def _open_system_default(path: Path) -> str:
 def create_test(
     path: str | Path,
     content: str = "",
-    template: str = "auto",  
+    template: str = "auto",
     open_after_create: bool = True,
 ) -> str:
-    """
-    Создаёт файл (любой, не только тест) с опциональным шаблоном и открывает его.
-
-    Args:
-        path: Путь, куда создать файл (с любым именем).
-        content: Содержимое файла. Если пусто — используется шаблон.
-        template: Шаблон содержимого. Если "auto" — определяется по расширению.
-                  Доступные: 'pytest', 'unittest', 'python', 'markdown',
-                  'json', 'yaml', 'text', 'empty'.
-        open_after_create: Если True (по умолчанию), файл автоматически
-                          открывается в редакторе после создания.
-
-    Returns:
-        str: URI файла (file:///path/to/file) для evidence_link в xAPI.
-    """
+    """Создаёт файл с опциональным шаблоном и открывает его."""
     path = Path(path).resolve()
 
-    # Если файл уже существует — просто открываем его
     if path.exists():
         if open_after_create:
             print(f"  Файл уже существует, открываю: {path}")
@@ -182,7 +167,7 @@ def create_test(
         else:
             raise FileExistsError(f"File already exists: {path}")
 
-    # Автоопределение шаблона по расширению
+    # Автоопределение шаблона
     if template == "auto":
         template = _detect_template_by_extension(path)
         print(f"  Автоопределение шаблона: {template}")
@@ -191,10 +176,10 @@ def create_test(
     if not content:
         content = _get_template(template, path.stem)
 
-    # Создаём родительские директории, если их нет
+    # Создаём родительские директории
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Записываем файл
+    # Записываем файл с явной кодировкой UTF-8
     path.write_text(content, encoding="utf-8")
     print(f"  Файл создан: {path}")
 

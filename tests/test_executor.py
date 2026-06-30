@@ -252,7 +252,7 @@ class TestCreateTest:
 
             assert result == f"file://{file.resolve()}"
             assert file.exists()
-            content = file.read_text()
+            content = file.read_text(encoding='utf-8')
             assert "def test_placeholder" in content
             assert "assert True" in content
             mock_open.assert_called_once()
@@ -267,7 +267,7 @@ class TestCreateTest:
 
             assert result == f"file://{file.resolve()}"
             assert file.exists()
-            content = file.read_text()
+            content = file.read_text(encoding='utf-8')
             assert "import unittest" in content
             assert "class Test" in content
 
@@ -349,7 +349,7 @@ class TestCreateTest:
             result = create_test(file, template="python")
 
             assert file.exists()
-            content = file.read_text()
+            content = file.read_text(encoding='utf-8')
             assert "def main():" in content
             assert 'if __name__ == "__main__"' in content
 
@@ -362,7 +362,7 @@ class TestCreateTest:
             result = create_test(file, template="markdown")
 
             assert file.exists()
-            content = file.read_text()
+            content = file.read_text(encoding='utf-8')
             assert "# Readme" in content
             assert "## Описание" in content
 
@@ -375,7 +375,7 @@ class TestCreateTest:
             result = create_test(file, template="text")
 
             assert file.exists()
-            content = file.read_text()
+            content = file.read_text(encoding='utf-8')
             assert "Notes" in content
 
     def test_unknown_template_raises(self, tmp_path: Path):
@@ -533,7 +533,7 @@ class TestAutoTemplateSelection:
             result = create_test(file)  # template="auto" по умолчанию
 
             assert file.exists()
-            content = file.read_text()
+            content = file.read_text(encoding='utf-8')
             # Должен быть python-шаблон
             assert "Module: classes" in content
             assert "TODO: add module description" in content
@@ -550,7 +550,7 @@ class TestAutoTemplateSelection:
             result = create_test(file)
 
             assert file.exists()
-            content = file.read_text()
+            content = file.read_text(encoding='utf-8')
             assert "# Readme" in content
             assert "## Описание" in content
 
@@ -563,7 +563,7 @@ class TestAutoTemplateSelection:
             result = create_test(file)
 
             assert file.exists()
-            content = file.read_text()
+            content = file.read_text(encoding='utf-8')
             # JSON-файл создаётся пустым (шаблон "empty")
             assert content == ""
 
@@ -576,7 +576,7 @@ class TestAutoTemplateSelection:
             result = create_test(file)
 
             assert file.exists()
-            content = file.read_text()
+            content = file.read_text(encoding='utf-8')
             # YAML-файл создаётся пустым (шаблон "empty")
             assert content == ""
 
@@ -589,7 +589,7 @@ class TestAutoTemplateSelection:
             result = create_test(file)
 
             assert file.exists()
-            content = file.read_text()
+            content = file.read_text(encoding='utf-8')
             assert "Notes" in content
 
     def test_test_file_still_gets_pytest_template(self, tmp_path: Path):
@@ -601,7 +601,7 @@ class TestAutoTemplateSelection:
             result = create_test(file)
 
             assert file.exists()
-            content = file.read_text()
+            content = file.read_text(encoding='utf-8')
             assert "def test_placeholder" in content
             assert "assert True" in content
 
@@ -615,6 +615,6 @@ class TestAutoTemplateSelection:
             result = create_test(file, template="pytest")
 
             assert file.exists()
-            content = file.read_text()
+            content = file.read_text(encoding='utf-8')
             # Должен быть pytest-шаблон, несмотря на расширение .py
             assert "def test_placeholder" in content
