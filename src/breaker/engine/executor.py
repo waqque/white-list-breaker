@@ -154,7 +154,7 @@ def _open_system_default(path: Path) -> str:
 def create_test(
     path: str | Path,
     content: str = "",
-    template: str = "pytest",
+    template: str = "auto",  
     open_after_create: bool = True,
 ) -> str:
     """
@@ -163,29 +163,29 @@ def create_test(
     Args:
         path: Путь, куда создать файл (с любым именем).
         content: Содержимое файла. Если пусто — используется шаблон.
-        template: Шаблон содержимого ('pytest', 'unittest', 'python',
-                  'markdown', 'text', 'empty').
+        template: Шаблон содержимого. Если "auto" — определяется по расширению.
+                  Доступные: 'pytest', 'unittest', 'python', 'markdown',
+                  'json', 'yaml', 'text', 'empty'.
         open_after_create: Если True (по умолчанию), файл автоматически
-                          открывается в редакторе после создания. Если файл
-                          уже существует — просто открывается.
+                          открывается в редакторе после создания.
 
     Returns:
         str: URI файла (file:///path/to/file) для evidence_link в xAPI.
-
-    Raises:
-        FileExistsError: Файл уже существует И open_after_create=False.
-        OSError: Если не удалось создать файл.
-        ValueError: Неизвестный шаблон.
     """
     path = Path(path).resolve()
 
-    # Если файл уже существует — просто открываем его (не падаем)
+    # Если файл уже существует — просто открываем его
     if path.exists():
         if open_after_create:
             print(f"  Файл уже существует, открываю: {path}")
             return open_file(path)
         else:
             raise FileExistsError(f"File already exists: {path}")
+
+    # Автоопределение шаблона по расширению
+    if template == "auto":
+        template = _detect_template_by_extension(path)
+        print(f"  Автоопределение шаблона: {template}")
 
     # Если контент не задан — берём из шаблона
     if not content:
@@ -203,6 +203,29 @@ def create_test(
         return open_file(path)
 
     return f"file://{path}"
+
+
+def _detect_template_by_extension(path: Path) -> str:
+    """Определить шаблон по расширению файла.
+    """
+    suffix = path.suffix.lower()
+    name = path.name.lower()
+
+    # Тестовые файлы — всегда pytest
+    if name.startswith("test_") or name.endswith("_test.py"):
+        return "pytest"
+
+    # По расширению
+    extension_map = {
+        ".py": "python",
+        ".md": "markdown",
+        ".json": "empty",     
+        ".yaml": "empty",     
+        ".yml": "empty",      
+        ".txt": "text",
+    }
+
+    return extension_map.get(suffix, "empty")
 
 
 def _get_template(template: str, module_name: str) -> str:
