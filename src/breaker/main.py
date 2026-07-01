@@ -45,6 +45,7 @@ console = Console()
 _progress_paused = False
 _current_monitor = None
 _monitor_thread = None
+_monitor_result = None  # Результат мониторинга
 
 
 def set_progress_paused(paused: bool):
@@ -57,7 +58,7 @@ def signal_handler(signum, frame):
     """Обработчик сигнала Ctrl+C."""
     global _current_monitor, _monitor_thread
     
-    console.print("\n[yellow]⏸️ Получен сигнал прерывания...[/yellow]")
+    console.print("\n[yellow]Получен сигнал прерывания...[/yellow]")
     
     # Если есть активный монитор - останавливаем его
     if _current_monitor:
@@ -69,7 +70,7 @@ def signal_handler(signum, frame):
         _monitor_thread.join(timeout=2)
     
     # Выходим из программы
-    console.print("\n[dim]👋 До свидания! Удачи в работе![/dim]\n")
+    console.print("\n[dim]До свидания! Удачи в работе![/dim]\n")
     sys.exit(0)
 
 
@@ -84,7 +85,7 @@ def show_welcome():
             "[bold magenta]White-sheet-breaker[/bold magenta]\n"
             "[dim]Инструмент для преодоления прокрастинации через правила «если-то»[/dim]\n\n"
             "[cyan]Гипотеза:[/cyan] Превращение размытого намерения в конкретное\n"
-            "правило «ЕСЛИ [сигнал] → ТО [действие]» и немедленное выполнение\n"
+            "правило «ЕСЛИ [сигнал] -> ТО [действие]» и немедленное выполнение\n"
             "микро-шага снижает психологическое сопротивление.",
             border_style="magenta",
             padding=(1, 2),
@@ -97,12 +98,12 @@ def show_main_menu():
     console.print()
     console.print(
         Panel(
-            "[bold white][1][/bold white] 🎯 Создать правило с нуля\n"
-            "[bold white][2][/bold white] 📋 Использовать готовый шаблон\n"
-            "[bold white][3][/bold white] 📚 Управление шаблонами (редактор)\n"
-            "[bold white][4][/bold white] 🎬 Демо-режим (полный цикл без ввода)\n"
-            "[bold white][5][/bold white] 📊 Посмотреть статистику (логи)\n"
-            "[bold white][0][/bold white] 🚪 Выход",
+            "[bold white][1][/bold white] Создать правило с нуля\n"
+            "[bold white][2][/bold white] Использовать готовый шаблон\n"
+            "[bold white][3][/bold white] Управление шаблонами (редактор)\n"
+            "[bold white][4][/bold white] Демо-режим (полный цикл без ввода)\n"
+            "[bold white][5][/bold white] Посмотреть статистику (логи)\n"
+            "[bold white][0][/bold white] Выход",
             title="[bold cyan]Что хотите сделать?[/bold cyan]",
             border_style="cyan",
             padding=(1, 2),
@@ -122,7 +123,10 @@ def show_main_menu():
 # ============================================================================
 def run_with_monitoring(ritual: Ritual, blocking: bool = False) -> threading.Thread | None:
     """Запустить фоновое наблюдение за активностью пользователя."""
-    global _current_monitor, _monitor_thread
+    global _current_monitor, _monitor_thread, _monitor_result
+    
+    # Сбрасываем результат мониторинга
+    _monitor_result = None
     
     # Определяем файлы для наблюдения
     watched_files = []
@@ -130,7 +134,7 @@ def run_with_monitoring(ritual: Ritual, blocking: bool = False) -> threading.Thr
         watched_files.append(Path(ritual.target))
 
     if not watched_files:
-        console.print("[yellow]⚠️ Нет файлов для наблюдения[/yellow]")
+        console.print("[yellow]Нет файлов для наблюдения[/yellow]")
         return None
 
     # Создаём монитор
@@ -149,20 +153,21 @@ def run_with_monitoring(ritual: Ritual, blocking: bool = False) -> threading.Thr
     )
     
     _current_monitor = monitor
+    monitor_result = None
 
     def _run_monitor():
+        nonlocal monitor_result
+        global _monitor_result
         try:
             result = monitor.start_monitoring()
+            monitor_result = result
+            _monitor_result = result
             if result == "success":
-                console.print("[green]🎉 Отлично! Вы начали работу.[/green]")
-            elif result == "timeout":
-                console.print("[yellow]⏰ Сессия завершена из-за неактивности.[/yellow]")
-            elif result == "interrupted":
-                console.print("[yellow]⏸️ Мониторинг прерван пользователем.[/yellow]")
-            else:
-                console.print("[dim]👋 Мониторинг завершён.[/dim]")
+                console.print("[green]Отлично! Вы начали работу.[/green]")
+            elif result == "inactive":
+                console.print("[red]Активность не зафиксирована![/red]")
         except Exception as e:
-            console.print(f"[red]❌ Ошибка мониторинга: {e}[/red]")
+            console.print(f"[red]Ошибка мониторинга: {e}[/red]")
         finally:
             _current_monitor = None
 
@@ -170,18 +175,18 @@ def run_with_monitoring(ritual: Ritual, blocking: bool = False) -> threading.Thr
         _run_monitor()
         return None
     else:
-        thread = threading.Thread(target=_run_monitor, daemon=True)
+        # Убираем daemon=True, чтобы поток не завершался с main
+        thread = threading.Thread(target=_run_monitor, daemon=False)
         thread.start()
         _monitor_thread = thread
         return thread
 
-
 # ============================================================================
-# Полный цикл: правило → выполнение → (опционально таймер) → наблюдение → лог → xAPI
+# Полный цикл: правило -> выполнение -> (опционально таймер) -> наблюдение -> лог -> xAPI
 # ============================================================================
 def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
     """Выполнить полный цикл работы модуля."""
-    global _monitor_thread
+    global _monitor_thread, _monitor_result
     
     console.print()
     console.print(
@@ -200,14 +205,15 @@ def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
     result = execute_ritual(ritual)
 
     if result.success:
-        console.print(f"[green]✅ Действие выполнено успешно[/green]")
+        console.print(f"[green]Действие выполнено успешно[/green]")
         console.print(f"[dim]   Evidence: {result.evidence_link}[/dim]")
     else:
-        console.print(f"[red]❌ Ошибка: {result.error_message}[/red]")
+        console.print(f"[red]Ошибка: {result.error_message}[/red]")
 
     # Шаг 3: Опциональный Pomodoro-таймер + фоновое наблюдение
     monitor_thread = None
     monitor_started = False
+    monitor_inactive = False  # Флаг неактивности
 
     if result.success and not skip_timer:
         console.print()
@@ -225,7 +231,6 @@ def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
         # Запускаем фоновое наблюдение (если это файл)
         if ritual.action_type in [ActionType.OPEN_FILE, ActionType.CREATE_TEST]:
             console.print()
-            console.print("[bold cyan]👀 Запускаю фоновое наблюдение...[/bold cyan]")
             console.print("[dim]Модуль поможет, если вы зависнете.[/dim]")
             monitor_thread = run_with_monitoring(ritual, blocking=False)
             monitor_started = True
@@ -237,56 +242,79 @@ def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
             try:
                 timer_completed = run_timer_with_prompt()
                 if timer_completed:
-                    console.print("[green]🎉 Pomodoro завершён![/green]")
+                    console.print("[green]Pomodoro завершён![/green]")
                 else:
-                    console.print("[yellow]⏸️ Pomodoro прерван.[/yellow]")
+                    console.print("[yellow]Pomodoro прерван.[/yellow]")
             except KeyboardInterrupt:
-                console.print("\n[yellow]⏸️ Таймер прерван пользователем.[/yellow]")
+                console.print("\n[yellow]Таймер прерван пользователем.[/yellow]")
             except Exception as e:
-                console.print(f"[yellow]⚠️ Ошибка таймера: {e}[/yellow]")
+                console.print(f"[yellow]Ошибка таймера: {e}[/yellow]")
 
+        # Если мониторинг запущен, ждём его завершения
         # Если мониторинг запущен, ждём его завершения
         if monitor_started and monitor_thread:
             console.print()
-            console.print("[dim]⏳ Ожидаем вашу активность в файле...[/dim]")
-            console.print("[dim](Начните редактировать файл, чтобы завершить наблюдение)[/dim]")
             console.print("[dim](Нажмите Ctrl+C для прерывания)[/dim]")
             
             try:
+                # Ждём завершения потока мониторинга
                 monitor_thread.join()
+                console.print("[dim]Мониторинг завершён[/dim]")
             except KeyboardInterrupt:
-                console.print("\n[yellow]⏸️ Ожидание прервано пользователем.[/yellow]")
-
-            if monitor_thread.is_alive():
-                console.print("[yellow]⚠️ Мониторинг всё ещё работает, но мы продолжаем...[/yellow]")
-            else:
-                console.print("[dim]✅ Наблюдение завершено[/dim]")
+                console.print("\n[yellow]Ожидание прервано пользователем.[/yellow]")
+                # Если пользователь прервал, останавливаем монитор
+                if _current_monitor:
+                    _current_monitor.set_interrupted()
+                monitor_thread.join(timeout=1)
             
             _monitor_thread = None
 
+            # Проверяем результат мониторинга
+            if _monitor_result == "inactive":
+                monitor_inactive = True
+                console.print("[red]Активность не зафиксирована![/red]")
     # Шаг 4: Логирование + xAPI (Участник А)
     console.print()
     console.print("[bold cyan]Шаг 4/4: Фиксирую результат...[/bold cyan]")
 
+    # Если мониторинг завершился неактивностью - помечаем результат как неуспешный
+    if monitor_inactive:
+        # Создаём новый результат с ошибкой
+        result = RitualResult(
+            ritual=ritual,
+            success=False,
+            error_message="Пользователь не начал работу в отведённое время",
+        )
+        result.mark_finished()
+        console.print("[red]Время вышло. Активность не зафиксирована.[/red]")
+
     # Логируем в NDJSON
     log_file = log_ritual_result(result)
-    console.print(f"[dim]📝 Записано в лог: {log_file}[/dim]")
+    console.print(f"[dim]Записано в лог: {log_file}[/dim]")
 
     # Отправляем xAPI-стейтмент
     config = LrsConfig.from_env()
     xapi_success = send_statement(result, config)
 
     if xapi_success:
-        console.print("[green]📡 xAPI-стейтмент отправлен[/green]")
+        console.print("[green]xAPI-стейтмент отправлен[/green]")
     else:
-        console.print("[yellow]⚠️ Не удалось отправить xAPI-стейтмент[/yellow]")
+        console.print("[yellow]Не удалось отправить xAPI-стейтмент[/yellow]")
 
     # Финальное сообщение
     console.print()
-    if result.success:
+    if monitor_inactive:
         console.print(
             Panel.fit(
-                "[bold green]🎉 Ритуал успешно завершён![/bold green]\n"
+                "[bold red]Активность не замечена[/bold red]\n\n"
+                "[dim]Запустите модуль заново, когда будете готовы.[/dim]",
+                border_style="red",
+            )
+        )
+    elif result.success:
+        console.print(
+            Panel.fit(
+                "[bold green]Ритуал успешно завершён![/bold green]\n"
                 "[dim]Ты сделал первый шаг. Продолжай в том же духе![/dim]",
                 border_style="green",
             )
@@ -294,7 +322,7 @@ def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
     else:
         console.print(
             Panel.fit(
-                "[bold yellow]⚠️ Ритуал завершён с ошибкой[/bold yellow]\n"
+                "[bold yellow]Ритуал завершён с ошибкой[/bold yellow]\n"
                 "[dim]Это нормально. Попробуй ещё раз с другим правилом.[/dim]",
                 border_style="yellow",
             )
@@ -309,7 +337,7 @@ def run_full_cycle(ritual: Ritual, skip_timer: bool = False) -> RitualResult:
 def mode_create_from_scratch(skip_timer: bool = False):
     """Создать правило через диалог и выполнить его."""
     console.print()
-    console.print("[bold cyan]🎯 Создаём новое правило «если-то»[/bold cyan]")
+    console.print("[bold cyan]Создаём новое правило «если-то»[/bold cyan]")
 
     try:
         ritual = run_dialog()
@@ -317,7 +345,7 @@ def mode_create_from_scratch(skip_timer: bool = False):
         console.print("\n[yellow]Диалог прерван.[/yellow]")
         return
     except Exception as e:
-        console.print(f"[red]❌ Ошибка в диалоге: {e}[/red]")
+        console.print(f"[red]Ошибка в диалоге: {e}[/red]")
         return
 
     if ritual is None:
@@ -333,7 +361,7 @@ def mode_create_from_scratch(skip_timer: bool = False):
 def mode_use_template(skip_timer: bool = False):
     """Выбрать шаблон, адаптировать и выполнить."""
     console.print()
-    console.print("[bold cyan]📋 Используем готовый шаблон[/bold cyan]")
+    console.print("[bold cyan]Используем готовый шаблон[/bold cyan]")
 
     storage = TemplateStorage()
     templates = storage.list_templates()
@@ -367,7 +395,7 @@ def mode_use_template(skip_timer: bool = False):
     template = storage.get_template(template_id)
 
     if template is None:
-        console.print(f"[red]❌ Шаблон '{template_id}' не найден.[/red]")
+        console.print(f"[red]Шаблон '{template_id}' не найден.[/red]")
         return
 
     # Показываем шаблон и даём возможность адаптировать
@@ -400,11 +428,11 @@ def mode_use_template(skip_timer: bool = False):
         ritual.action = action
         ritual.target = target
     except (ValueError, AttributeError) as e:
-        console.print(f"[yellow]⚠️ {e}. Создаём правило вручную.[/yellow]")
+        console.print(f"[yellow]{e}. Создаём правило вручную.[/yellow]")
         try:
             action_type = ActionType(template.action_type)
         except ValueError:
-            console.print(f"[red]❌ Неизвестный тип действия: {template.action_type}[/red]")
+            console.print(f"[red]Неизвестный тип действия: {template.action_type}[/red]")
             return
         ritual = Ritual(
             signal=signal,
@@ -432,7 +460,7 @@ def run_demo():
     console.print()
     console.print(
         Panel.fit(
-            "[bold magenta]🎬 ДЕМО-РЕЖИМ[/bold magenta]\n"
+            "[bold magenta]ДЕМО-РЕЖИМ[/bold magenta]\n"
             "[dim]Демонстрация полного цикла работы модуля[/dim]",
             border_style="magenta",
         )
@@ -485,7 +513,7 @@ def show_stats():
     from breaker.core.tracker import get_stats, read_log
 
     console.print()
-    console.print("[bold cyan]📊 Статистика работы модуля[/bold cyan]")
+    console.print("[bold cyan]Статистика работы модуля[/bold cyan]")
 
     stats = get_stats()
 
@@ -525,10 +553,10 @@ def show_stats():
         console.print()
         console.print("[bold cyan]Последние 5 ритуалов:[/bold cyan]")
         for entry in entries[-5:]:
-            status = "[green]✅[/green]" if entry.get("success") else "[red]❌[/red]"
+            status = "[green][/green]" if entry.get("success") else "[red][/red]"
             console.print(
                 f"  {status} [dim]{entry.get('timestamp', '')[:16]}[/dim] "
-                f"ЕСЛИ {entry.get('signal', '')} → ТО {entry.get('action', '')}"
+                f"ЕСЛИ {entry.get('signal', '')} -> ТО {entry.get('action', '')}"
             )
 
 
@@ -577,7 +605,7 @@ def main():
             choice = show_main_menu()
 
             if choice == 0:
-                console.print("\n[dim]👋 До свидания! Удачи в работе![/dim]\n")
+                console.print("\n[dim]До свидания! Удачи в работе![/dim]\n")
                 break
             elif choice == 1:
                 mode_create_from_scratch(skip_timer=args.no_timer)
@@ -593,10 +621,10 @@ def main():
             elif choice == 5:
                 show_stats()
             else:
-                console.print("[red]❌ Неизвестный пункт. Выберите 0-5.[/red]")
+                console.print("[red]Неизвестный пункт. Выберите 0-5.[/red]")
 
     except KeyboardInterrupt:
-        console.print("\n\n[yellow]🚫 Прервано пользователем.[/yellow]")
+        console.print("\n\n[yellow]Прервано пользователем.[/yellow]")
         sys.exit(0)
 
 
