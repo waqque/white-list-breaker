@@ -13,7 +13,12 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from breaker.engine.executor import open_file, execute_ritual, create_test
+from breaker.engine.executor import (
+    open_file,
+    execute_ritual,
+    create_test,
+    _detect_template_by_extension,
+)
 from breaker.engine.exceptions import (
     BreakerFileNotFoundError,
     CommandNotFoundError,
@@ -247,7 +252,7 @@ class TestCreateTest:
 
             assert result == f"file://{file.resolve()}"
             assert file.exists()
-            content = file.read_text()
+            content = file.read_text(encoding='utf-8')
             assert "def test_placeholder" in content
             assert "assert True" in content
             mock_open.assert_called_once()
@@ -262,7 +267,7 @@ class TestCreateTest:
 
             assert result == f"file://{file.resolve()}"
             assert file.exists()
-            content = file.read_text()
+            content = file.read_text(encoding='utf-8')
             assert "import unittest" in content
             assert "class Test" in content
 
@@ -344,7 +349,7 @@ class TestCreateTest:
             result = create_test(file, template="python")
 
             assert file.exists()
-            content = file.read_text()
+            content = file.read_text(encoding='utf-8')
             assert "def main():" in content
             assert 'if __name__ == "__main__"' in content
 
@@ -357,7 +362,7 @@ class TestCreateTest:
             result = create_test(file, template="markdown")
 
             assert file.exists()
-            content = file.read_text()
+            content = file.read_text(encoding='utf-8')
             assert "# Readme" in content
             assert "## Описание" in content
 
@@ -370,7 +375,7 @@ class TestCreateTest:
             result = create_test(file, template="text")
 
             assert file.exists()
-            content = file.read_text()
+            content = file.read_text(encoding='utf-8')
             assert "Notes" in content
 
     def test_unknown_template_raises(self, tmp_path: Path):
@@ -443,3 +448,173 @@ class TestExecuteRitualExtended:
             assert test_file.read_text() == "# existing"
             # open_file был вызван
             mock_open.assert_called_once()
+
+# Тесты для _detect_template_by_extension()
+
+
+class TestDetectTemplateByExtension:
+    """Тесты функции автоопределения шаблона по расширению файла."""
+
+    def test_regular_python_file(self):
+        """Обычный .py файл → шаблон 'python'."""
+        assert _detect_template_by_extension(Path("classes.py")) == "python"
+        assert _detect_template_by_extension(Path("main.py")) == "python"
+        assert _detect_template_by_extension(Path("utils.py")) == "python"
+        assert _detect_template_by_extension(Path("src/app.py")) == "python"
+
+    def test_test_file_prefix(self):
+        """Файл с префиксом test_ → шаблон 'pytest'."""
+        assert _detect_template_by_extension(Path("test_main.py")) == "pytest"
+        assert _detect_template_by_extension(Path("test_app.py")) == "pytest"
+        assert _detect_template_by_extension(Path("test_classes.py")) == "pytest"
+        assert _detect_template_by_extension(Path("tests/test_utils.py")) == "pytest"
+
+    def test_test_file_suffix(self):
+        """Файл с суффиксом _test.py → шаблон 'pytest'."""
+        assert _detect_template_by_extension(Path("main_test.py")) == "pytest"
+        assert _detect_template_by_extension(Path("app_test.py")) == "pytest"
+
+    def test_markdown_extension(self):
+        """Markdown (.md) → шаблон 'markdown'."""
+        assert _detect_template_by_extension(Path("README.md")) == "markdown"
+        assert _detect_template_by_extension(Path("CHANGELOG.md")) == "markdown"
+        assert _detect_template_by_extension(Path("docs/guide.md")) == "markdown"
+
+    def test_json_extension(self):
+        """JSON (.json) → шаблон 'empty' (нет json-шаблона в executor)."""
+        assert _detect_template_by_extension(Path("config.json")) == "empty"
+
+    def test_yaml_extension(self):
+        """YAML (.yaml и .yml) → шаблон 'empty' (нет yaml-шаблона в executor)."""
+        assert _detect_template_by_extension(Path("settings.yaml")) == "empty"
+        assert _detect_template_by_extension(Path("settings.yml")) == "empty"
+
+    def test_text_extension(self):
+        """Text (.txt) → шаблон 'text'."""
+        assert _detect_template_by_extension(Path("notes.txt")) == "text"
+        assert _detect_template_by_extension(Path("todo.txt")) == "text"
+
+    def test_unknown_extension(self):
+        """Неизвестное расширение → шаблон 'empty'."""
+        assert _detect_template_by_extension(Path("file.xyz")) == "empty"
+        assert _detect_template_by_extension(Path("data.csv")) == "empty"
+        assert _detect_template_by_extension(Path("image.png")) == "empty"
+
+    def test_no_extension(self):
+        """Файл без расширения → шаблон 'empty'."""
+        assert _detect_template_by_extension(Path("Makefile")) == "empty"
+        assert _detect_template_by_extension(Path("Dockerfile")) == "empty"
+
+    def test_case_insensitive(self):
+        """Расширение нечувствительно к регистру."""
+        assert _detect_template_by_extension(Path("README.MD")) == "markdown"
+        assert _detect_template_by_extension(Path("config.JSON")) == "empty"
+        assert _detect_template_by_extension(Path("main.PY")) == "python"
+        
+    def test_test_detection_case_insensitive(self):
+        """Определение тестовых файлов нечувствительно к регистру."""
+        assert _detect_template_by_extension(Path("TEST_main.py")) == "pytest"
+        assert _detect_template_by_extension(Path("Main_TEST.py")) == "pytest"
+
+
+# Тест на исправление бага: файлы с расширением .py должен получать python-шаблон
+
+
+class TestAutoTemplateSelection:
+    """Тесты автоопределения шаблона при создании файлов.
+    """
+
+    def test_classes_py_gets_python_template(self, tmp_path: Path):
+        """classes.py без явного template получает python-шаблон."""
+        file = tmp_path / "classes.py"
+
+        with patch("breaker.engine.executor.open_file") as mock_open:
+            mock_open.return_value = f"file://{file.resolve()}"
+            result = create_test(file)  # template="auto" по умолчанию
+
+            assert file.exists()
+            content = file.read_text(encoding='utf-8')
+            # Должен быть python-шаблон
+            assert "Module: classes" in content
+            assert "TODO: add module description" in content
+            # НЕ должен быть pytest-шаблон
+            assert "def test_placeholder" not in content
+            assert "assert True" not in content
+
+    def test_readme_md_gets_markdown_template(self, tmp_path: Path):
+        """README.md без явного template получает markdown-шаблон."""
+        file = tmp_path / "README.md"
+
+        with patch("breaker.engine.executor.open_file") as mock_open:
+            mock_open.return_value = f"file://{file.resolve()}"
+            result = create_test(file)
+
+            assert file.exists()
+            content = file.read_text(encoding='utf-8')
+            assert "# Readme" in content
+            assert "## Описание" in content
+
+    def test_config_json_gets_json_template(self, tmp_path: Path):
+        """config.json без явного template создаётся пустым (нет json-шаблона в executor)."""
+        file = tmp_path / "config.json"
+
+        with patch("breaker.engine.executor.open_file") as mock_open:
+            mock_open.return_value = f"file://{file.resolve()}"
+            result = create_test(file)
+
+            assert file.exists()
+            content = file.read_text(encoding='utf-8')
+            # JSON-файл создаётся пустым (шаблон "empty")
+            assert content == ""
+
+    def test_settings_yaml_gets_yaml_template(self, tmp_path: Path):
+        """settings.yaml без явного template создаётся пустым (нет yaml-шаблона в executor)."""
+        file = tmp_path / "settings.yaml"
+
+        with patch("breaker.engine.executor.open_file") as mock_open:
+            mock_open.return_value = f"file://{file.resolve()}"
+            result = create_test(file)
+
+            assert file.exists()
+            content = file.read_text(encoding='utf-8')
+            # YAML-файл создаётся пустым (шаблон "empty")
+            assert content == ""
+
+    def test_notes_txt_gets_text_template(self, tmp_path: Path):
+        """notes.txt без явного template получает text-шаблон."""
+        file = tmp_path / "notes.txt"
+
+        with patch("breaker.engine.executor.open_file") as mock_open:
+            mock_open.return_value = f"file://{file.resolve()}"
+            result = create_test(file)
+
+            assert file.exists()
+            content = file.read_text(encoding='utf-8')
+            assert "Notes" in content
+
+    def test_test_file_still_gets_pytest_template(self, tmp_path: Path):
+        """test_*.py без явного template получает pytest-шаблон."""
+        file = tmp_path / "test_main.py"
+
+        with patch("breaker.engine.executor.open_file") as mock_open:
+            mock_open.return_value = f"file://{file.resolve()}"
+            result = create_test(file)
+
+            assert file.exists()
+            content = file.read_text(encoding='utf-8')
+            assert "def test_placeholder" in content
+            assert "assert True" in content
+
+    def test_explicit_template_overrides_auto(self, tmp_path: Path):
+        """Явно указанный template переопределяет автоопределение."""
+        file = tmp_path / "classes.py"
+
+        with patch("breaker.engine.executor.open_file") as mock_open:
+            mock_open.return_value = f"file://{file.resolve()}"
+            # Принудительно указываем pytest для .py файла
+            result = create_test(file, template="pytest")
+
+            assert file.exists()
+            content = file.read_text(encoding='utf-8')
+            # Должен быть pytest-шаблон, несмотря на расширение .py
+            assert "def test_placeholder" in content

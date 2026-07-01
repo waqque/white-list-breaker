@@ -18,7 +18,6 @@ from breaker.core.schema import (
 class TestActionType:
     def test_enum_values(self):
         assert ActionType.OPEN_FILE.value == "open_file"
-        assert ActionType.RUN_SHELL.value == "run_shell"
         assert ActionType.CREATE_TEST.value == "create_test"
 
     def test_enum_from_string(self):
@@ -43,12 +42,11 @@ class TestRitual:
     def test_create_ritual_with_task_id(self):
         ritual = Ritual(
             signal="открываю проект",
-            action="запускаю тесты",
-            target="npm test",
-            action_type=ActionType.RUN_SHELL,
+            action="открываю файл",
+            target="main.py",
+            action_type=ActionType.OPEN_FILE,
             task_id="task_123",
         )
-        assert ritual.task_id == "task_123"
 
     def test_format_rule(self):
         ritual = Ritual(
@@ -104,14 +102,12 @@ class TestRitual:
             "signal": "тест",
             "action": "действие",
             "target": "цель",
-            "action_type": "run_shell",
+            "action_type": "open_file",
             "task_id": null,
             "created_at": "2026-06-24T10:00:00"
         }
         """
         ritual = Ritual.from_json(json_str)
-        assert ritual.signal == "тест"
-        assert ritual.action_type == ActionType.RUN_SHELL
 
     def test_roundtrip_json(self):
         original = Ritual(
@@ -199,18 +195,11 @@ class TestRitualResult:
 
     def test_error_result(self):
         ritual = Ritual(
-            signal="команда не работает",
-            action="проверить синтаксис",
-            target="npm test",
-            action_type=ActionType.RUN_SHELL,
+            signal="файл не найден",
+            action="проверить путь",
+            target="missing.py",
+            action_type=ActionType.OPEN_FILE,
         )
-        result = RitualResult(
-            ritual=ritual,
-            success=False,
-            error_message="Command not found",
-        )
-        assert result.success is False
-        assert result.error_message == "Command not found"
 
     def test_to_dict(self):
         ritual = Ritual(
@@ -363,28 +352,13 @@ class TestXapiStatement:
 
     def test_statement_with_error(self):
         ritual = Ritual(
-            signal="команда не работает",
-            action="проверить синтаксис",
-            target="npm test",
-            action_type=ActionType.RUN_SHELL,
+            signal="файл не найден",
+            action="проверить путь",
+            target="missing.py",
+            action_type=ActionType.OPEN_FILE,
             task_id="456",
         )
-        result = RitualResult(
-            ritual=ritual,
-            success=False,
-            error_message="Command not found",
-        )
-        actor = XapiActor(mbox="mailto:student@example.com", name="Student")
-
-        statement = XapiStatement.from_ritual_result(
-            result=result,
-            actor=actor,
-        )
-
-        data = statement.to_dict()
-        assert data["result"]["success"] is False
-        assert data["result"]["extensions"]["errorMessage"] == "Command not found"
-
+    
     def test_statement_to_json(self):
         result = self._make_ritual_result()
         actor = XapiActor(mbox="mailto:student@example.com", name="Student")

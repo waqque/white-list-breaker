@@ -40,15 +40,22 @@ def success_result():
 
 @pytest.fixture
 def error_result():
+    from breaker.core.schema import RitualResult
+    
     ritual = Ritual(
-        signal="команда не работает",
-        action="проверить синтаксис",
-        target="npm test",
-        action_type=ActionType.RUN_SHELL,
+        signal="файл не найден",
+        action="проверить путь",
+        target="missing.py",
+        action_type=ActionType.OPEN_FILE,
         task_id="task_456",
     )
-    return RitualResult(ritual=ritual, success=False, error_message="Command not found")
-
+    result = RitualResult(
+        ritual=ritual,
+        success=False,
+        error_message="File not found: missing.py",
+    )
+    result.mark_finished()
+    return result
 
 @pytest.fixture
 def actor():
@@ -242,7 +249,7 @@ class TestSendStatement:
 
         assert result is True
         captured = capsys.readouterr()
-        assert "Command not found" in captured.out
+        assert "File not found: missing.py" in captured.out
 
 
 class TestSendStatementsBatch:

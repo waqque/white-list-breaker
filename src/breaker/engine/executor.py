@@ -154,32 +154,12 @@ def _open_system_default(path: Path) -> str:
 def create_test(
     path: str | Path,
     content: str = "",
-    template: str = "pytest",
+    template: str = "auto",
     open_after_create: bool = True,
 ) -> str:
-    """
-    Создаёт файл (любой, не только тест) с опциональным шаблоном и открывает его.
-
-    Args:
-        path: Путь, куда создать файл (с любым именем).
-        content: Содержимое файла. Если пусто — используется шаблон.
-        template: Шаблон содержимого ('pytest', 'unittest', 'python',
-                  'markdown', 'text', 'empty').
-        open_after_create: Если True (по умолчанию), файл автоматически
-                          открывается в редакторе после создания. Если файл
-                          уже существует — просто открывается.
-
-    Returns:
-        str: URI файла (file:///path/to/file) для evidence_link в xAPI.
-
-    Raises:
-        FileExistsError: Файл уже существует И open_after_create=False.
-        OSError: Если не удалось создать файл.
-        ValueError: Неизвестный шаблон.
-    """
+    """Создаёт файл с опциональным шаблоном и открывает его."""
     path = Path(path).resolve()
 
-    # Если файл уже существует — просто открываем его (не падаем)
     if path.exists():
         if open_after_create:
             print(f"  Файл уже существует, открываю: {path}")
@@ -187,14 +167,19 @@ def create_test(
         else:
             raise FileExistsError(f"File already exists: {path}")
 
+    # Автоопределение шаблона
+    if template == "auto":
+        template = _detect_template_by_extension(path)
+        print(f"  Автоопределение шаблона: {template}")
+
     # Если контент не задан — берём из шаблона
     if not content:
         content = _get_template(template, path.stem)
 
-    # Создаём родительские директории, если их нет
+    # Создаём родительские директории
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Записываем файл
+    # Записываем файл с явной кодировкой UTF-8
     path.write_text(content, encoding="utf-8")
     print(f"  Файл создан: {path}")
 
@@ -203,6 +188,29 @@ def create_test(
         return open_file(path)
 
     return f"file://{path}"
+
+
+def _detect_template_by_extension(path: Path) -> str:
+    """Определить шаблон по расширению файла.
+    """
+    suffix = path.suffix.lower()
+    name = path.name.lower()
+
+    # Тестовые файлы — всегда pytest
+    if name.startswith("test_") or name.endswith("_test.py"):
+        return "pytest"
+
+    # По расширению
+    extension_map = {
+        ".py": "python",
+        ".md": "markdown",
+        ".json": "empty",     
+        ".yaml": "empty",     
+        ".yml": "empty",      
+        ".txt": "text",
+    }
+
+    return extension_map.get(suffix, "empty")
 
 
 def _get_template(template: str, module_name: str) -> str:
