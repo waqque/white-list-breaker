@@ -76,19 +76,19 @@ def show_help_level1(file_path: Path) -> int:
             console.print("[bold white][1][/bold white] Шаблон функции")
             console.print("[bold white][2][/bold white] Шаблон класса")
             console.print("[bold white][3][/bold white] Написать TODO")
-            console.print("[bold white][4][/bold white] Таймер на 5 минут")
+            console.print("[bold white][4][/bold white] Таймер")
             console.print("[bold white][5][/bold white] Ничего, продолжу сам")
     elif file_type == 'markdown':
         console.print("[bold white][1][/bold white] Шаблон Markdown-документа")
         console.print("[bold white][2][/bold white] Написать заголовок")
-        console.print("[bold white][3][/bold white] Таймер на 5 минут")
+        console.print("[bold white][3][/bold white] Таймер")
         console.print("[bold white][4][/bold white] Ничего, продолжу сам")
     elif file_type in ('json', 'yaml'):
         console.print(f"[bold white][1][/bold white] Шаблон {file_type.upper()}-файла")
-        console.print("[bold white][2][/bold white] Таймер на 5 минут")
+        console.print("[bold white][2][/bold white] Таймер")
         console.print("[bold white][3][/bold white] Ничего, продолжу сам")
     else:
-        console.print("[bold white][1][/bold white] Таймер на 5 минут")
+        console.print("[bold white][1][/bold white] Таймер")
         console.print("[bold white][2][/bold white] Ничего, продолжу сам")
 
     console.print()

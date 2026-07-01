@@ -5,7 +5,7 @@
 Если пользователь начал работать — завершает наблюдение.
 
 Реализует конечный автомат состояний:
-    IDLE → HELP_LEVEL_1 → HELP_LEVEL_2 → TIMEOUT
+    IDLE -> HELP_LEVEL_1 -> HELP_LEVEL_2 -> TIMEOUT
       ↓           ↓              ↓
     ACTIVE    ACTIVE         ACTIVE
       ↓           ↓              ↓
@@ -152,7 +152,7 @@ class ActivityMonitor:
             console.print()
             console.print(
                 Panel(
-                    "[bold yellow]💡 Помощь при бездействии[/bold yellow]",
+                    "[bold yellow]Помощь при бездействии[/bold yellow]",
                     border_style="yellow",
                 )
             )
@@ -215,7 +215,7 @@ class ActivityMonitor:
 
         elif result.startswith("open:"):
             file_to_open = Path(result.split(":", 1)[1])
-            console.print(f"[dim]📂 Открываю {file_to_open}...[/dim]")
+            console.print(f"[dim]Открываю {file_to_open}...[/dim]")
             try:
                 from breaker.engine.executor import open_file
                 open_file(file_to_open)
@@ -240,7 +240,7 @@ class ActivityMonitor:
         
         Returns:
             str: "success" — пользователь начал работать,
-                "timeout" — сессия завершена из-за неактивности,
+                "inactive" — сессия завершена из-за неактивности,
                 "interrupted" — прерван пользователем,
                 "stopped" — мониторинг остановлен вручную.
         """
@@ -254,15 +254,12 @@ class ActivityMonitor:
         self.interrupted = False
 
         console.print()
-        console.print("[bold cyan]Наблюдаю за вашей активностью...[/bold cyan]")
         console.print(
             f"[dim]Отслеживаю {len(self.watched_files)} файл(ов). "
-            f"Порог активности: {self.activity_threshold} символов.[/dim]"
         )
         for f in self.watched_files:
-            console.print(f"[dim]  → {f}[/dim]")
+            console.print(f"[dim]  -> {f}[/dim]")
         console.print()
-        console.print("[dim](Нажмите Ctrl+C для прерывания)[/dim]")
         console.print()
 
         try:
@@ -278,7 +275,6 @@ class ActivityMonitor:
 
                 # Уровень 1: первое напоминание
                 if self.help_level == 0 and idle_time >= self.idle_threshold_level1:
-                    console.print(f"\n[dim]⏰ Бездействие {int(idle_time)} сек. Показываю помощь уровня 1[/dim]")
                     result = self._handle_help_level1()
                     self._process_help_result(result)
 
@@ -290,7 +286,6 @@ class ActivityMonitor:
                         self.last_activity_time = time.time()
                         # help_level остается 1 (установлено в _handle_help_level1)
                         self.pending_action = False
-                        console.print("[dim]✅ Таймер бездействия сброшен (уровень 1)[/dim]")
                         continue
                     elif result == "timer":
                         self.last_activity_time = time.time()
@@ -299,7 +294,7 @@ class ActivityMonitor:
 
                 # Уровень 2: второе напоминание
                 elif self.help_level == 1 and idle_time >= self.idle_threshold_level2:
-                    console.print(f"\n[dim]⏰ Бездействие {int(idle_time)} сек. Показываю помощь уровня 2[/dim]")
+
                     result = self._handle_help_level2()
                     self._process_help_result(result)
 
@@ -311,7 +306,6 @@ class ActivityMonitor:
                         self.last_activity_time = time.time()
                         # help_level остается 2 (установлено в _handle_help_level2)
                         self.pending_action = False
-                        console.print("[dim]✅ Таймер бездействия сброшен (уровень 2)[/dim]")
                         continue
                     elif result == "timer":
                         self.last_activity_time = time.time()
@@ -324,7 +318,7 @@ class ActivityMonitor:
                     console.print(
                         f"[yellow]Сессия завершена из-за длительного бездействия ({int(idle_time)} сек).[/yellow]"
                     )
-                    return "timeout"
+                    return "inactive"
 
                 # Проверяем изменения файла (пользователь начал работать)
                 if self._check_file_modified():
@@ -335,7 +329,7 @@ class ActivityMonitor:
                     )
                     # Если изменения есть, но меньше порога — это ручная активность
                     if 0 < total_diff < self.activity_threshold:
-                        console.print(f"[dim]📝 Обнаружены изменения ({total_diff} символов)[/dim]")
+                        console.print(f"[dim]Обнаружены изменения ({total_diff} символов)[/dim]")
                         self.last_activity_time = time.time()
                         # Сбрасываем уровень помощи, потому что пользователь начал работать
                         self.help_level = 0
@@ -350,7 +344,6 @@ class ActivityMonitor:
                 time.sleep(self.check_interval)
 
         except KeyboardInterrupt:
-            console.print("\n[yellow]Мониторинг прерван пользователем.[/yellow]")
             return "interrupted"
 
         return "stopped"
@@ -358,4 +351,3 @@ class ActivityMonitor:
     def stop_monitoring(self):
         """Остановить мониторинг."""
         self.running = False
-        console.print("[dim]Мониторинг остановлен.[/dim]")

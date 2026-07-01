@@ -130,9 +130,9 @@ def detect_action_type(target: str, file_mode: str) -> ActionType:
     """Автоматически определить тип действия.
 
     Логика:
-    - Если режим "create" → CREATE_TEST (используем для создания любых файлов)
-    - Если режим "open" и target содержит 'test' → CREATE_TEST
-    - Иначе → OPEN_FILE
+    - Если режим "create" -> CREATE_TEST (используем для создания любых файлов)
+    - Если режим "open" и target содержит 'test' -> CREATE_TEST
+    - Иначе -> OPEN_FILE
 
     Args:
         target: Путь к файлу
@@ -212,7 +212,7 @@ def confirm_rule(ritual: Ritual) -> bool:
     if hasattr(ritual, "format_rule"):
         rule_text = ritual.format_rule()
     else:
-        rule_text = f"ЕСЛИ {ritual.signal} → ТО {ritual.action}"
+        rule_text = f"ЕСЛИ {ritual.signal} -> ТО {ritual.action}"
 
     console.print(
         Panel(
@@ -354,8 +354,7 @@ def main_menu() -> None:
     Позволяет пользователю:
     - Создать правило с нуля
     - Использовать готовый шаблон
-    - Открыть редактор шаблонов
-    - Выйти из программы
+    - Открыть редактор шаблонов    - Выйти из программы
     """
     console.print(
         Panel(

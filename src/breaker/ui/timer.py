@@ -264,8 +264,6 @@ def pomodoro_timer(minutes: int = 5) -> bool:
     _timer_progress = None
     _timer_task = None
 
-    console.print()
-    console.print("[bold green]Время вышло! Отличная работа![/bold green]")
 
     _play_sound()
 
@@ -294,7 +292,6 @@ def run_timer_with_prompt() -> bool:
     )
 
     minutes = ask_duration()
-    console.print(f"\n[green]Запускаем таймер на {minutes} мин[/green]")
     return pomodoro_timer(minutes)
 
 
