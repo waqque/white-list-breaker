@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "white-sheet-breaker"
-version = "0.1.1"
+version = "0.1.3"
 description = "Модуль ритуала начала задачи — помогает студентам преодолеть прокрастинацию через правила «если-то»"
 readme = "README.md"
 license = {text = "MIT"}
@@ -35,6 +35,9 @@ dev = [
     "flake8>=6.1.0",
     "black>=23.7.0",
 ]
+
+[project.scripts]
+wsb = "breaker.main:main"
 
 [project.urls]
 Repository = "https://github.com/waqque/white-list-breaker"
