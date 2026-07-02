@@ -65,11 +65,32 @@
 
 ## 4. Пример использования
 
-### Запуск
+### Установка из PyPI
 
 ```bash
+pip install white-sheet-breaker
+```
+
+### Установка из исходного кода 
+
+```bash
+git clone https://github.com/waqque/white-list-breaker.git
+cd white-list-breaker
+pip install -e .
+```
+
+# Запуск
+
+## Интерактивный режим
+```
 python -m breaker
 ```
+
+## Демо-режим
+```
+python -m breaker --demo
+```
+
 
 ### Диалог создания правила
 

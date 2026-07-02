@@ -37,6 +37,7 @@
 
 | Метрика | Значение |
 |---|---|
+| PyPI | https://pypi.org/project/white-sheet-breaker/ |
 | Язык | Python 3.10+ |
 | Тестов | 315 |
 | Покрытие | ~88% |
