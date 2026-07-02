@@ -112,15 +112,73 @@ white-list-breaker/
 
 ## 5. Взаимодействие модулей
 
-```
-МАШКА!!!!
+```mermaid
+flowchart LR
+    subgraph UI["UI"]
+        D[dialog.py]
+        TM[timer.py]
+        TE[template_editor.py]
+        AM[activity_monitor.py]
+        HM[help_menu.py]
+    end
+
+    subgraph Engine["Engine"]
+        EX[executor.py]
+        FT[file_templates.py]
+        TS[templates.py]
+    end
+
+    subgraph Core["Core"]
+        SC[schema.py]
+        TR[tracker.py]
+        XC[xapi_client.py]
+    end
+
+    subgraph Ext["Внешние"]
+        FS[Файлы]
+        LRS[LRS]
+        ED[Редактор]
+    end
+
+    MA[main.py] -->|"запускает поток"| AM
+    MA -->|"вызывает: run_dialog()"| D
+    MA -->|"вызывает: run_timer_with_prompt()"| TM
+    MA -->|"вызывает: execute_ritual()"| EX
+    MA -->|"вызывает: editor_menu()"| TE
+    MA -->|"вызывает: log_ritual_result()"| TR
+    MA -->|"вызывает: send_statement()"| XC
+
+    D -->|"импорт: Ritual, ActionType"| SC
+    D -->|"импорт: TemplateStorage"| TS
+
+    TE -->|"вызов: save/load/search"| TS
+    TE -->|"импорт: RuleTemplate"| TS
+
+    AM -->|"callback: show_help"| HM
+    HM -->|"вызов: FileTemplates.get_template()"| FT
+    HM -->|"вставка текста/шаблона"| FS
+
+    EX -->|"импорт: Ritual, RitualResult"| SC
+    EX -->|"запись: open/create"| FS
+    EX -->|"запуск: code/open"| ED
+
+    TS -->|"to_ritual() → Ritual"| SC
+
+    TR -->|"запись: NDJSON"| FS
+    XC -->|"POST: /statements"| LRS
+
+    style UI fill:#dae8fc,stroke:#6c8ebf
+    style Engine fill:#d5e8d4,stroke:#82b366
+    style Core fill:#f9d5e5,stroke:#e8a0bf
+    style Ext fill:#fff2cc,stroke:#d6b656
+    style MA fill:#e1d5e7,stroke:#9673a6
 ```
 
 
 **Ключевые моменты:**
 
 - Все модули UI и Engine импортируют модели из `core/schema.py`, что обеспечивает единую модель данных.
-- `main.py` запускает фоновое наблюдение в daemon-потоке, чтобы оно работало параллельно с таймером.
+- `main.py` запускает фоновое наблюдение в потоке, чтобы оно работало параллельно с таймером.
 - `activity_monitor.py` вызывает функции из `help_menu.py` через колбэки, что обеспечивает слабую связанность.
 - `help_menu.py` использует `file_templates.py` для вставки шаблонов в файлы.
 
