@@ -5,8 +5,26 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "white-sheet-breaker"
 version = "0.1.0"
-description = "Модуль ритуала начала задачи"
+description = "Модуль ритуала начала задачи — помогает студентам преодолеть прокрастинацию через правила «если-то»"
+readme = "README.md"
+license = {text = "MIT"}
 requires-python = ">=3.10"
+authors = [
+    {name = "ccccxxip", email = "saliona66@gmail.com"},
+    {name = "waqque", email = "tanos_hanos@mail.ru"},
+    {name = "omaria123", email = "ogorodnikovamaria07@gmail.com"},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Education",
+    "Intended Audience :: Developers",
+    "Topic :: Education",
+]
+keywords = ["procrastination", "ritual", "student", "education", "if-then", "xapi", "learning"]
 dependencies = [
     "rich>=13.0.0",
     "requests>=2.31.0",
@@ -20,6 +38,73 @@ dev = [
     "black>=23.7.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/waqque/white-list-breaker"
+Repository = "https://github.com/waqque/white-list-breaker"
+Issues = "https://github.com/waqque/white-list-breaker/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["breaker*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.flake8]
+max-line-length = 100
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "white-sheet-breaker"
+version = "0.1.0"
+description = "Модуль ритуала начала задачи — помогает студентам преодолеть прокрастинацию через правила «если-то»"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "ccccxxip (https://github.com/waqque/white-list-breaker/commits?author=ccccxxip)", email = "saliona66@gmail.com"},
+    {name = "waqque (https://github.com/waqque/white-list-breaker/commits?author=waqque)", email = "tanos_hanos@mail.ru"},
+    {name = "omaria123 (https://github.com/waqque/white-list-breaker/commits?author=omaria123)", email = "ogorodnikovamaria07@gmail.com"},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Education",
+    "Intended Audience :: Developers",
+    "Topic :: Education",
+]
+keywords = ["procrastination", "ritual", "student", "education", "if-then", "xapi", "learning"]
+dependencies = [
+    "rich>=13.0.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "flake8>=6.1.0",
+    "black>=23.7.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/waqque/white-list-breaker"
+Repository = "https://github.com/waqque/white-list-breaker"
+
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["breaker*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
@@ -30,4 +115,4 @@ target-version = ["py310"]
 
 [tool.flake8]
 max-line-length = 100
-exclude = [".git", "__pycache__", "venv"]
+exclude = [".git", "__pycache__", "venv", ".pytest_cache", "build", "dist"]
