@@ -8,8 +8,35 @@
 
 Проект построен по трёхслойной архитектуре с чётким разделением ответственности:
 
-```
-МАШКА!!!!!
+```mermaid
+flowchart TB
+    subgraph UI["UI"]
+        UI1[Задаёт вопросы<br/>Показывает правило<br/>Запускает таймер<br/>Предлагает помощь]
+    end
+
+    subgraph Core["Core"]
+        C1[Хранит правила<br/>Формирует отчёты<br/>Отправляет аналитику]
+    end
+
+    subgraph Engine["Engine"]
+        E1[Создаёт файлы<br/>Открывает редактор<br/>Генерирует шаблоны]
+    end
+
+    subgraph Storage["Storage/Analytics"]
+        S1[Сохраняет логи<br/>Отправляет отчёты<br/>Редактор]
+    end
+
+    UI -->|"правило"| Core
+    Core -->|"команда"| Engine
+    Engine -->|"файл"| Storage
+    Engine -->|"результат"| Core
+    Core -->|"логи"| Storage
+    Core -->|"аналитика"| Storage
+
+    style UI fill:#dae8fc,stroke:#6c8ebf
+    style Core fill:#f9d5e5,stroke:#e8a0bf
+    style Engine fill:#d5e8d4,stroke:#82b366
+    style Storage fill:#fff2cc,stroke:#d6b656
 ```
 
 
