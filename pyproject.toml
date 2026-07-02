@@ -4,15 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "white-sheet-breaker"
-version = "0.1.0"
+version = "0.1.1"
 description = "Модуль ритуала начала задачи — помогает студентам преодолеть прокрастинацию через правила «если-то»"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [
-    {name = "ccccxxip", email = "saliona66@gmail.com"},
-    {name = "waqque", email = "tanos_hanos@mail.ru"},
-    {name = "omaria123", email = "ogorodnikovamaria07@gmail.com"},
+    {name = "ccccxxip, waqque, omaria123"}
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
