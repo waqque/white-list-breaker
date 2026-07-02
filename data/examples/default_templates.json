@@ -1,0 +1,38 @@
+{
+  "templates": [
+    {
+      "id": "open_empty_file",
+      "name": "Открыть пустой файл",
+      "signal": "файл пуст",
+      "action": "открыть файл в редакторе",
+      "target": "example.py",
+      "action_type": "open_file",
+      "description": "Когда видишь пустой файл — открой его и начни писать",
+      "created_at": "2026-06-26T10:00:00",
+      "is_system": true
+    },
+    {
+      "id": "create_test_template",
+      "name": "Создать шаблон теста",
+      "signal": "нет тестов для функции",
+      "action": "создать файл теста",
+      "target": "test_example.py",
+      "action_type": "create_test",
+      "description": "Создай шаблон теста и начни писать тесты",
+      "created_at": "2026-06-26T10:00:00",
+      "is_system": true
+    },
+    {
+      "id": "open_readme",
+      "name": "Открыть README",
+      "signal": "не помню, как работает проект",
+      "action": "открыть README.md",
+      "target": "README.md",
+      "action_type": "open_file",
+      "description": "Перечитай документацию, чтобы вспомнить контекст",
+      "created_at": "2026-06-26T10:00:00",
+      "is_system": true
+    }
+    
+  ]
+}
